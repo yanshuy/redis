@@ -24,12 +24,9 @@ func main() {
 
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
-	req, err := ReadRequest(conn)
+	_, err := ReadRequest(conn)
 	if err != nil {
 		log.Println("error reading")
 	}
-	err = HandleRequest(req)
-	if err != nil {
-		log.Println("error handling request", err)
-	}
+
 }

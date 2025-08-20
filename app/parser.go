@@ -1,11 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
+	"strings"
 )
 
 type Request struct {
@@ -27,46 +28,51 @@ func ReadRequest(conn net.Conn) (*Request, error) {
 	read := 0
 	for {
 		n, err := conn.Read(b[start:])
+		if n > 0 {
+			start += n
+			o, err2 := r.parseRequest(b[read:start])
+			if err2 != nil {
+				return nil, err2
+			}
+			fmt.Println("req parse done", r.commands, err, err2)
+			read += o
+		}
+
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
 			return nil, err
 		}
-
-		o, err := r.parseRequest(b[read : start+n])
-		if err != nil {
-			return nil, err
-		}
-		read += o
-		start += n
 	}
 
+	fmt.Println("returing req", r.commands)
 	return r, nil
 }
 
 func (r *Request) parseRequest(b []byte) (n int, err error) {
-	for n < len(b) {
-		i := bytes.IndexByte(b[n:], '\n')
-		if i == -1 {
-			return 0, nil
-		}
-		r.commands = append(r.commands, string(b[:i]))
-		n += i + 1 // including "\n"
+	if len(b) == 0 {
+		return 0, nil
 	}
+	// i := bytes.IndexByte(b[n:], '\n')
+	// if i == -1 {
+	// 	return 0, nil
+	// }
+	err = r.HandleRequest(string(b[:]))
+	if err != nil {
+		log.Println("error handling request", err)
+	}
+	// n += i + 1 // including "\n"
+	n += len(b)
 	return n, nil
 }
 
-func HandleRequest(r *Request) (err error) {
-	for _, cmd := range r.commands {
-		switch cmd {
-		case "PING":
-			r.conn.Write([]byte("+PONG\r\n"))
-			return nil
-		default:
-			return errors.New("unknown command")
-		}
+func (r *Request) HandleRequest(line string) (err error) {
+	switch {
+	case strings.Contains(line, "PING"):
+		r.conn.Write([]byte("+PONG\r\n"))
+		return nil
+	default:
+		return errors.New("unknown command")
 	}
-	log.Panicln("should not reach")
-	return nil
 }
