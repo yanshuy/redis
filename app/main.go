@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 )
@@ -10,8 +11,18 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to bind to port 6379")
 	}
-	_, err = l.Accept()
-	if err != nil {
-		log.Fatal("Error accepting connection: ", err.Error())
+
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			continue
+		}
+		go handleConnection(conn)
 	}
+}
+
+func handleConnection(conn net.Conn) {
+	defer conn.Close()
+	conn.Write([]byte("+PONG\r\n"))
 }
