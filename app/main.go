@@ -24,5 +24,12 @@ func main() {
 
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
-	conn.Write([]byte("+PONG\r\n"))
+	req, err := ReadRequest(conn)
+	if err != nil {
+		log.Println("error reading")
+	}
+	err = HandleRequest(req)
+	if err != nil {
+		log.Println("error handling request", err)
+	}
 }
