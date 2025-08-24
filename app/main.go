@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net"
+
+	"github.com/codecrafters-io/redis-starter-go/app/request"
 )
 
 func main() {
@@ -24,9 +26,9 @@ func main() {
 
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
-	_, err := ReadRequest(conn)
-	if err != nil {
-		log.Println("error reading")
-	}
 
+	n, err := request.ReadAndHandleRequest(conn)
+	if err != nil {
+		log.Println("error reading", err, "\nbytes read", n)
+	}
 }
