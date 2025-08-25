@@ -1,6 +1,7 @@
 package request
 
 import (
+	"fmt"
 	"io"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
@@ -57,6 +58,7 @@ func HandleRequest(w io.Writer, rs []resp.DataType) (err error) {
 
 		// fmt.Printf("res %+v\n", res)
 		resBytes := res.ToResponse()
+		fmt.Printf("res %+v\n", resBytes)
 		_, err := w.Write(resBytes)
 		if err != nil {
 			return err
