@@ -88,8 +88,8 @@ func HandleCmd(cmd string, args []string) resp.DataType {
 		if len(args) < 2 {
 			return resp.NewData(resp.Error, "wrong number of arguments for 'rpush' command")
 		}
-		store.R.Rpush(args[0], args[1:])
-		return resp.NewData(resp.Integer, int64(len(args)-1))
+		l := store.R.Rpush(args[0], args[1:])
+		return resp.NewData(resp.Integer, int64(l))
 
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd)

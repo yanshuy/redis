@@ -35,18 +35,18 @@ func (rs RedisStore) Set(key string, val string, ttl_ms int64) {
 
 func (rs RedisStore) Get(key string) (string, bool) {
 	mem, ok := rs.Store[key]
-	return mem.data.String, ok
+	return *mem.data.String, ok
 }
 
 func (rs RedisStore) Rpush(key string, val []string) int {
 	var mem StoreMember
-	if !rs.KeyExists(key) {
+	if rs.KeyExists(key) {
+		mem = rs.Store[key]
+		mem.AssignValue(val)
+	} else {
 		mem = NewStoreMember(List)
 		mem.AssignValue(val)
 		rs.Store[key] = mem
-	} else {
-		mem = rs.Store[key]
-		mem.AssignValue(val)
 	}
 	return len(mem.data.List)
 }
