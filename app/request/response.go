@@ -1,46 +1,74 @@
 package request
 
 import (
-	"errors"
+	"fmt"
 	"io"
 	"strings"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
 )
 
+var Store = make(map[string]string)
+
 func HandleRequest(w io.Writer, rs []resp.DataType) (err error) {
 	for _, r := range rs {
 		// fmt.Printf("%+v \n", r)
+		var res resp.DataType
 		switch r.Type {
 		case resp.Array:
-			err = HandleCmd(w, r.Arr[0], r.Arr[1:])
+			args := make([]string, 0, len(r.Arr))
+			for i := 1; i < len(r.Arr); i++ {
+				args = append(args, r.Arr[i].Str)
+			}
+			res = HandleCmd(r.Arr[0].Str, args)
+
 		default:
-			err = HandleCmd(w, r, nil)
+			res = HandleCmd(r.Str, nil)
+		}
+
+		_, err := w.Write(res.ToResponse())
+		if err != nil {
+			return err
 		}
 	}
 
 	return err
 }
 
-func HandleCmd(w io.Writer, cmd resp.DataType, args []resp.DataType) error {
-	switch strings.ToLower(cmd.String()) {
+func HandleCmd(cmd string, args []string) resp.DataType {
+	switch strings.ToLower(cmd) {
 	case "ping":
-		w.Write([]byte("+PONG\r\n"))
+		return resp.NewData(resp.String, "PONG")
 
 	case "echo":
-		res := ""
-		for _, d := range args {
-			res += d.String()
+		if len(args) != 1 {
+			return resp.NewData(resp.Error, "wrong number of arguments for 'echo' command")
 		}
-		// TODO: more than 1 args allowed?
-		if res == "" {
-			w.Write([]byte("-ERROR 'echo' command expects a single argumentd\r\n"))
+		return resp.NewData(resp.String, args[0])
+
+	case "get":
+		if len(args) != 1 {
+			return resp.NewData(resp.Error, "wrong number of arguments for 'get' command")
+		}
+		key := args[0]
+		if val, ok := Store[key]; ok {
+			return resp.NewData(resp.BulkString, val)
 		} else {
-			w.Write([]byte("+" + res + "\r\n"))
+			return resp.NewData(resp.BulkString, "")
 		}
 
+	case "set":
+		if len(args) != 2 {
+			return resp.NewData(resp.Error, "wrong number of arguments for 'set' command")
+		}
+		key := args[0]
+		val := args[1]
+		Store[key] = val
+
+		return resp.NewData(resp.String, "OK")
+
 	default:
-		return errors.New("unknown command: " + cmd.String())
+		msg := fmt.Sprintf("unknown command `%s`", cmd)
+		return resp.NewData(resp.Error, msg)
 	}
-	return nil
 }
