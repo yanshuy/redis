@@ -137,7 +137,6 @@ func (d *DataType) ToResponse() []byte {
 		for _, sd := range d.Arr {
 			res = append(res, sd.ToResponse()...)
 		}
-		res = fmt.Append(res, crlf)
 		return res
 
 	default:
