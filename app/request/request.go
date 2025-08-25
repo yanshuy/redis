@@ -80,45 +80,60 @@ func HandleCmd(cmd string, args []string) resp.DataType {
 		return resp.NewData(resp.String, args[0])
 
 	case "get":
-		if len(args) != 1 {
-			return resp.NewData(resp.Error, "wrong number of arguments for 'get' command")
-		}
-		key := args[0]
-		if val, ok := store.R.Get(key); ok {
-			return resp.NewData(resp.BulkString, val)
-		} else {
-			return resp.NewData(resp.BulkString, "")
-		}
-
+		return HandleCmdGet(cmd, args)
 	case "set":
+		return HandleCmdSet(cmd, args)
+
+	case "rpush":
 		if len(args) < 2 {
-			return resp.NewData(resp.Error, "wrong number of arguments for 'set' command")
+			return resp.NewData(resp.Error, "wrong number of arguments for 'rpush' command")
 		}
-		key := args[0]
-		val := args[1]
-		expiry := 0
-
-		if len(args) >= 4 {
-			switch args[2] {
-			case "px", "ex":
-				exp, err := strconv.Atoi(args[3])
-				if err != nil {
-					return resp.NewData(resp.Error, "wrong expiry time expected a number")
-				}
-				if args[2] == "ex" {
-					expiry = exp * 1000
-				} else {
-					expiry = exp
-				}
-			}
-		}
-
-		store.R.Set(key, val, int64(expiry))
-
-		return resp.NewData(resp.String, "OK")
+		store.R.Rpush(args[0], args[1:])
+		return resp.NewData(resp.Integer, len(args)-1)
 
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd)
 		return resp.NewData(resp.Error, msg)
 	}
+}
+
+func HandleCmdGet(cmd string, args []string) resp.DataType {
+	if len(args) != 1 {
+		return resp.NewData(resp.Error, "wrong number of arguments for 'get' command")
+	}
+	key := args[0]
+	if val, ok := store.R.Get(key); ok {
+		return resp.NewData(resp.BulkString, val)
+	} else {
+		return resp.NewData(resp.BulkString, "")
+	}
+}
+
+func HandleCmdSet(cmd string, args []string) resp.DataType {
+	if len(args) < 2 {
+		return resp.NewData(resp.Error, "wrong number of arguments for 'set' command")
+	}
+	key := args[0]
+	val := args[1]
+	expiry := 0
+
+	if len(args) >= 4 {
+		switch args[2] {
+		case "px", "ex":
+			exp, err := strconv.Atoi(args[3])
+			if err != nil {
+				return resp.NewData(resp.Error, "wrong expiry time expected a number")
+			}
+			if args[2] == "ex" {
+				expiry = exp * 1000
+			} else {
+				expiry = exp
+			}
+		default:
+			return resp.NewData(resp.Error, "unknown argument")
+		}
+	}
+
+	store.R.Set(key, val, int64(expiry))
+	return resp.NewData(resp.String, "OK")
 }
