@@ -63,7 +63,7 @@ func (rs RedisStore) Lpush(key string, val []string) (int, error) {
 			return 0, fmt.Errorf("provided key '%s' holds some other data", key)
 		}
 		mem = rs.Store[key]
-		mem.AssignValue(val)
+		mem.data.List = append(val, mem.data.List...)
 	} else {
 		mem = NewStoreMember(List)
 		mem.AssignValue(val)
@@ -79,10 +79,10 @@ func (rs RedisStore) Lrange(key string, startIdx int, endIdx int) ([]string, err
 			return nil, fmt.Errorf("provided key '%s' holds some other data", key)
 		}
 		if startIdx < 0 {
-			startIdx = len(m.data.List) - startIdx
+			startIdx = len(m.data.List) + startIdx
 		}
 		if endIdx < 0 {
-			endIdx = len(m.data.List) - endIdx
+			endIdx = len(m.data.List) + endIdx
 		}
 		if startIdx >= endIdx || startIdx > len(m.data.List) {
 			return []string{}, nil
@@ -90,7 +90,6 @@ func (rs RedisStore) Lrange(key string, startIdx int, endIdx int) ([]string, err
 		if endIdx >= len(m.data.List) {
 			endIdx = len(m.data.List) - 1
 		}
-		fmt.Println(startIdx, endIdx)
 		items := make([]string, 0, endIdx-startIdx)
 		for i := startIdx; i < endIdx+1; i++ {
 			items = append(items, m.data.List[i])

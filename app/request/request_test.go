@@ -196,3 +196,30 @@ func TestRequest_LRANGE_WrongArity(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, conn.Output(), "-ERROR")
 }
+
+func TestRequest_LRANGE_NegativeEnd(t *testing.T) {
+	resetStore()
+	// RPUSH list_key a b c d e ; LRANGE list_key 2 -1  => c d e
+	payload := "*7\r\n$5\r\nRPUSH\r\n$8\r\nlist_key\r\n$1\r\na\r\n$1\r\nb\r\n$1\r\nc\r\n$1\r\nd\r\n$1\r\ne\r\n" +
+		"*4\r\n$6\r\nLRANGE\r\n$8\r\nlist_key\r\n$1\r\n2\r\n$2\r\n-1\r\n"
+	conn := newRW(payload)
+	_, err := ReadAndHandleRequest(conn)
+	require.NoError(t, err)
+	out := conn.Output()
+	// Expect 3 elements c d e
+	require.Contains(t, out, "*3")
+	require.Contains(t, out, "$1\r\nc")
+	require.Contains(t, out, "$1\r\nd")
+	require.Contains(t, out, "$1\r\ne")
+}
+
+func TestRequest_LRANGE_NegativeEnd2(t *testing.T) {
+	resetStore()
+	payload := "*6\r\n$5\r\nRPUSH\r\n$9\r\nraspberry\r\n$6\r\nbanana\r\n$4\r\npear\r\n$9\r\nblueberry\r\n$9\r\nraspberry\r\n*4\r\n$6\r\nLRANGE\r\n$9\r\nraspberry\r\n$1\r\n0\r\n$2\r\n-3\r\n"
+	conn := newRW(payload)
+	_, err := ReadAndHandleRequest(conn)
+	require.NoError(t, err)
+	out := conn.Output()
+	// Expect 3 elements c d e
+	fmt.Println(out)
+}
