@@ -3,6 +3,7 @@ package request
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
@@ -207,4 +208,18 @@ func HandleLrange(key string, args []resp.DataType) resp.DataType {
 		return resp.NewData(resp.Error, err.Error())
 	}
 	return resp.NewData(resp.Array, elems)
+}
+
+func HandleBlpop(key string, timeout_s time.Duration) resp.DataType {
+	timer := time.NewTimer(timeout_s * time.Second)
+	elemChan := make(chan string)
+
+	for {
+		select {
+		case elem := <-elemChan:
+			return resp.NewData(resp.BulkString, elem)
+		case <-timer.C:
+			return resp.NewData(resp.BulkString, "")
+		}
+	}
 }
