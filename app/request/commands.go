@@ -116,6 +116,22 @@ func HandleRpush(key string, args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.Integer, int64(l))
 }
 
+func HandleLpush(key string, args []resp.DataType) resp.DataType {
+	strArgs := make([]string, 0, len(args))
+	for _, arg := range args {
+		if arg.Is(resp.String) {
+			strArgs = append(strArgs, arg.Str)
+		} else {
+			return resp.NewData(resp.Error, "invalid argument type for 'rpush' command expects only string")
+		}
+	}
+	l, err := store.DB.Lpush(key, strArgs)
+	if err != nil {
+		return resp.NewData(resp.Error, err.Error())
+	}
+	return resp.NewData(resp.Integer, int64(l))
+}
+
 func HandleLrange(key string, args []resp.DataType) resp.DataType {
 	startIdx, err := args[0].Integer()
 	if err != nil {
