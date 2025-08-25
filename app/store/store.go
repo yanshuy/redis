@@ -75,16 +75,19 @@ func (rs RedisStore) Lpush(key string, val []string) (int, error) {
 	return len(mem.data.List), nil
 }
 
-func (rs RedisStore) Lpop(key string) (string, error) {
+func (rs RedisStore) Lpop(key string, popCount int) ([]string, error) {
 	if m, ok := rs.Look(key); ok {
 		if m.data.Type != List {
-			return "", fmt.Errorf("provided key '%s' does not hold a list", key)
+			return nil, fmt.Errorf("provided key '%s' does not hold a list", key)
 		}
-		popped := m.data.List[0]
-		m.data.List = m.data.List[1:]
+		popped := make([]string, 0, popCount)
+		for i := range popCount {
+			popped = append(popped, m.data.List[i])
+		}
+		m.data.List = m.data.List[popCount:]
 		return popped, nil
 	} else {
-		return "", nil
+		return []string{}, nil
 	}
 }
 

@@ -72,14 +72,18 @@ func HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 		return HandleLlen(key)
 
 	case "lpop":
-		if len(args) != 1 {
+		if len(args) < 1 || len(args) > 2 {
 			return resp.NewData(resp.Error, "wrong number of arguments for 'lpop' command")
 		}
 		key := args[0].Str
 		if key == "" {
 			return resp.NewData(resp.Error, "key must be a string length > 0")
 		}
-		return HandleLpop(key)
+		pops, err := args[1].Integer()
+		if err != nil {
+			return resp.NewData(resp.Error, "2nd argument must be a integer")
+		}
+		return HandleLpop(key, int(pops))
 
 	case "lrange":
 		if len(args) != 3 {
@@ -162,12 +166,16 @@ func HandleLpush(key string, args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.Integer, int64(l))
 }
 
-func HandleLpop(key string) resp.DataType {
-	l, err := store.DB.Lpop(key)
+func HandleLpop(key string, pops int) resp.DataType {
+	l, err := store.DB.Lpop(key, pops)
 	if err != nil {
 		return resp.NewData(resp.Error, err.Error())
 	}
-	return resp.NewData(resp.BulkString, l)
+	if len(l) == 0 {
+		return resp.NewData(resp.BulkString, l)
+	} else {
+		return resp.NewData(resp.Array, l)
+	}
 }
 
 func HandleLlen(key string) resp.DataType {
