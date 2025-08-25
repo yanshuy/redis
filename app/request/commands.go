@@ -122,7 +122,7 @@ func HandleLpush(key string, args []resp.DataType) resp.DataType {
 		if arg.Is(resp.String) {
 			strArgs = append(strArgs, arg.Str)
 		} else {
-			return resp.NewData(resp.Error, "invalid argument type for 'rpush' command expects only string")
+			return resp.NewData(resp.Error, "invalid argument type for 'Lpush' command expects only string")
 		}
 	}
 	l, err := store.DB.Lpush(key, strArgs)

@@ -56,6 +56,23 @@ func (rs RedisStore) Rpush(key string, val []string) (int, error) {
 	return len(mem.data.List), nil
 }
 
+func (rs RedisStore) Lpush(key string, val []string) (int, error) {
+	var mem *StoreMember
+	if m, ok := rs.Look(key); ok {
+		if m.data.Type != List {
+			return 0, fmt.Errorf("provided key '%s' holds some other data", key)
+		}
+		mem = rs.Store[key]
+		mem.AssignValue(val)
+	} else {
+		mem = NewStoreMember(List)
+		mem.AssignValue(val)
+		rs.Store[key] = mem
+	}
+	// fmt.Printf("%+v\n", mem)
+	return len(mem.data.List), nil
+}
+
 func (rs RedisStore) Lrange(key string, startIdx int, endIdx int) ([]string, error) {
 	if m, ok := rs.Look(key); ok {
 		if m.data.Type != List {
