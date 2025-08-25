@@ -51,6 +51,16 @@ func HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 		}
 		return HandleRpush(key, args[1:])
 
+	case "lpush":
+		if len(args) < 2 {
+			return resp.NewData(resp.Error, "wrong number of arguments for 'lpush' command")
+		}
+		key := args[0].Str
+		if key == "" {
+			return resp.NewData(resp.Error, "key must be a string length > 0")
+		}
+		return HandleLpush(key, args[1:])
+
 	case "lrange":
 		if len(args) != 3 {
 			return resp.NewData(resp.Error, "wrong number of arguments for 'rpush' command")
