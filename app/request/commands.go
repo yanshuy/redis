@@ -79,11 +79,16 @@ func HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 		if key == "" {
 			return resp.NewData(resp.Error, "key must be a string length > 0")
 		}
-		pops, err := args[1].Integer()
-		if err != nil {
-			return resp.NewData(resp.Error, "2nd argument must be a integer")
+
+		pops := 1
+		if len(args) == 2 {
+			p, err := args[1].Integer()
+			if err != nil {
+				return resp.NewData(resp.Error, "2nd argument must be a integer")
+			}
+			pops = int(p)
 		}
-		return HandleLpop(key, int(pops))
+		return HandleLpop(key, pops)
 
 	case "lrange":
 		if len(args) != 3 {
