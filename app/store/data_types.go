@@ -24,20 +24,24 @@ type StoreMember struct {
 	data     DataStruct
 }
 
-func NewStoreMember(t DataStructType, val any) (*StoreMember, error) {
-	m := &StoreMember{
+func NewStoreMember(t DataStructType) StoreMember {
+	m := StoreMember{
 		data: DataStruct{Type: t},
 	}
+	return m
+}
 
-	var err error
-	defer log.Println("NewStoreMember:", err)
-
-	switch t {
+func (m *StoreMember) AssignValue(val any) (err error) {
+	defer func() {
+		if err != nil {
+			log.Fatal("ERROR during store member value assignment", err)
+		}
+	}()
+	switch m.data.Type {
 	case String:
 		s, ok := val.(string)
 		if !ok {
-			err = fmt.Errorf("expected string for String type, got %T", val)
-			return nil, err
+			return fmt.Errorf("expected string for String type, got %T", val)
 		}
 		m.data.String = s
 	case List:
@@ -45,12 +49,11 @@ func NewStoreMember(t DataStructType, val any) (*StoreMember, error) {
 		case []string:
 			m.data.List = append(m.data.List, v...)
 		default:
-			err = fmt.Errorf("expected []string (or []any) for List type, got %T", val)
-			return nil, err
+			return fmt.Errorf("expected []string (or []any) for List type, got %T", val)
+
 		}
 	default:
-		err = fmt.Errorf("unknown data type: %d", t)
-		return nil, err
+		return fmt.Errorf("unknown data type: %d", m.data.Type)
 	}
-	return m, nil
+	return nil
 }
