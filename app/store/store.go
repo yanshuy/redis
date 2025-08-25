@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -48,5 +49,6 @@ func (rs RedisStore) Rpush(key string, val []string) int {
 		mem.AssignValue(val)
 		rs.Store[key] = mem
 	}
+	fmt.Printf("%+v\n", mem)
 	return len(mem.data.List)
 }
