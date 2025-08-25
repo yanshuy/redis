@@ -1,6 +1,7 @@
 package resp
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"strconv"
@@ -21,6 +22,13 @@ type DataType struct {
 	Arr  []DataType
 }
 
+func (d *DataType) Is(dataType byte) bool {
+	if dataType == String {
+		return d.Type == BulkString
+	}
+	return d.Type == dataType
+}
+
 func NewData(t byte, data any) DataType {
 	d := DataType{Type: t}
 	switch t {
@@ -34,9 +42,9 @@ func NewData(t byte, data any) DataType {
 		d.Int = data.(int64)
 		return d
 	case Array:
-		strs := data.([]string)
-		for _, s := range strs {
-			data := NewData(BulkString, s)
+		elems := data.([]string)
+		for _, elem := range elems {
+			data := NewData(BulkString, elem)
 			d.Arr = append(d.Arr, data)
 		}
 		return d
@@ -46,7 +54,7 @@ func NewData(t byte, data any) DataType {
 			d.Str = err.Error()
 			return d
 		}
-		log.Println("impossible branch: in NewDataType")
+		log.Fatal("unknown data type encountered:", string(t))
 		return d
 	}
 }
@@ -69,6 +77,21 @@ func NewData(t byte, data any) DataType {
 // 		return ""
 // 	}
 // }
+
+func (d *DataType) Integer() (int64, error) {
+	switch d.Type {
+	case String, BulkString:
+		i, err := strconv.ParseInt(d.Str, 10, 64)
+		if err != nil {
+			return 0, errors.New("bad integer conversion: " + err.Error())
+		}
+		return i, nil
+	case Integer:
+		return d.Int, nil
+	default:
+		return 0, errors.New("bad integer conversion: data is not of expected type")
+	}
+}
 
 func (d *DataType) ToResponse() []byte {
 	crlf := "\r\n"
@@ -110,6 +133,7 @@ func (d *DataType) ToResponse() []byte {
 		res := make([]byte, 0, 1+len(n)+2)
 		res = append(res, Array)
 		res = append(res, []byte(n)...)
+		res = fmt.Append(res, crlf)
 		for _, sd := range d.Arr {
 			res = append(res, sd.ToResponse()...)
 		}
@@ -117,7 +141,7 @@ func (d *DataType) ToResponse() []byte {
 		return res
 
 	default:
-		log.Println("impossible branch: in ToResponse")
+		log.Fatal("unknown data type encountered")
 		return []byte{}
 	}
 }

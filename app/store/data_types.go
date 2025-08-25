@@ -15,7 +15,7 @@ const (
 
 type DataStruct struct {
 	Type   DataStructType
-	String *string
+	String string
 	List   []string
 }
 
@@ -43,11 +43,10 @@ func (m *StoreMember) AssignValue(val any) (err error) {
 		if !ok {
 			return fmt.Errorf("expected string for String type, got %T", val)
 		}
-		m.data.String = &s
+		m.data.String = s
 	case List:
 		switch v := val.(type) {
 		case []string:
-			fmt.Printf("adding %+v\n", v)
 			m.data.List = append(m.data.List, v...)
 		default:
 			return fmt.Errorf("expected []string (or []any) for List type, got %T", val)

@@ -67,7 +67,7 @@ func TestRequest_MultipleInOneBuffer(t *testing.T) {
 	require.Equal(t, "+PONG\r\n+PONG\r\n", conn.Output())
 }
 
-func resetStore() { store.R = store.RedisStore{Store: make(map[string]store.StoreMember)} }
+func resetStore() { store.DB = store.RedisStore{Store: make(map[string]*store.StoreMember)} }
 
 func TestRequest_GET_MissingKey(t *testing.T) {
 	resetStore()
@@ -122,6 +122,75 @@ func TestRequest_GET_WrongArgs(t *testing.T) {
 func TestRequest_Unknown_Array(t *testing.T) {
 	resetStore()
 	payload := "*1\r\n$7\r\nUNKNOWN\r\n"
+	conn := newRW(payload)
+	_, err := ReadAndHandleRequest(conn)
+	require.NoError(t, err)
+	require.Contains(t, conn.Output(), "-ERROR")
+}
+
+// ---- List command tests (RPUSH / LRANGE) ----
+
+func TestRequest_RPUSH_NewList(t *testing.T) {
+	resetStore()
+	// RPUSH mylist a b c
+	payload := "*5\r\n$5\r\nRPUSH\r\n$6\r\nmylist\r\n$1\r\na\r\n$1\r\nb\r\n$1\r\nc\r\n"
+	conn := newRW(payload)
+	_, err := ReadAndHandleRequest(conn)
+	require.NoError(t, err)
+	// Should return integer length 3
+	require.Equal(t, ":3\r\n", conn.Output())
+}
+
+func TestRequest_RPUSH_Append(t *testing.T) {
+	resetStore()
+	// RPUSH mylist a b, then RPUSH mylist c
+	payload := "*4\r\n$5\r\nRPUSH\r\n$6\r\nmylist\r\n$1\r\na\r\n$1\r\nb\r\n*3\r\n$5\r\nRPUSH\r\n$6\r\nmylist\r\n$1\r\nc\r\n"
+	conn := newRW(payload)
+	_, err := ReadAndHandleRequest(conn)
+	require.NoError(t, err)
+	// First returns :2 then :3
+	require.Equal(t, ":2\r\n:3\r\n", conn.Output())
+}
+
+func TestRequest_LRANGE_Full(t *testing.T) {
+	resetStore()
+	// RPUSH then LRANGE mylist 0 2
+	payload := "*5\r\n$5\r\nRPUSH\r\n$6\r\nmylist\r\n$1\r\na\r\n$1\r\nb\r\n$1\r\nc\r\n*4\r\n$6\r\nLRANGE\r\n$6\r\nmylist\r\n$1\r\n0\r\n$1\r\n2\r\n"
+	conn := newRW(payload)
+	_, err := ReadAndHandleRequest(conn)
+	require.NoError(t, err)
+	// Expect array of 3 bulk strings: *3 $1 a $1 b $1 c (our RESP builder might format differently; adjust to produced output)
+	out := conn.Output()
+	require.Contains(t, out, "*3")
+	require.Contains(t, out, "$1\r\na")
+	require.Contains(t, out, "$1\r\nb")
+	require.Contains(t, out, "$1\r\nc")
+}
+
+func TestRequest_LRANGE_EmptyRange(t *testing.T) {
+	resetStore()
+	// RPUSH then LRANGE mylist 2 1 (start >= end) -> empty array
+	payload := "*4\r\n$5\r\nRPUSH\r\n$6\r\nmylist\r\n$1\r\na\r\n$1\r\nb\r\n*4\r\n$6\r\nLRANGE\r\n$6\r\nmylist\r\n$1\r\n2\r\n$1\r\n1\r\n"
+	conn := newRW(payload)
+	_, err := ReadAndHandleRequest(conn)
+	require.NoError(t, err)
+	require.Contains(t, conn.Output(), "*0\r\n")
+}
+
+func TestRequest_RPUSH_WrongArgTypes(t *testing.T) {
+	resetStore()
+	// Provide an empty bulk string? Here we simulate invalid by sending an integer style (but current parser may treat differently). Use missing args to trigger error.
+	payload := "*2\r\n$5\r\nRPUSH\r\n$6\r\nmylist\r\n"
+	conn := newRW(payload)
+	_, err := ReadAndHandleRequest(conn)
+	require.NoError(t, err)
+	require.Contains(t, conn.Output(), "-ERROR")
+}
+
+func TestRequest_LRANGE_WrongArity(t *testing.T) {
+	resetStore()
+	// LRANGE mylist 0 1 2 (too many)
+	payload := "*5\r\n$6\r\nLRANGE\r\n$6\r\nmylist\r\n$1\r\n0\r\n$1\r\n1\r\n$1\r\n2\r\n"
 	conn := newRW(payload)
 	_, err := ReadAndHandleRequest(conn)
 	require.NoError(t, err)
