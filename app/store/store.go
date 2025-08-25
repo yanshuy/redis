@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -63,6 +64,7 @@ func (rs RedisStore) Lpush(key string, val []string) (int, error) {
 			return 0, fmt.Errorf("provided key '%s' holds some other data", key)
 		}
 		mem = rs.Store[key]
+		slices.Reverse(val)
 		mem.data.List = append(val, mem.data.List...)
 	} else {
 		mem = NewStoreMember(List)
