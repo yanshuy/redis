@@ -9,7 +9,6 @@ import (
 )
 
 func HandleCmd(cmd string, args []resp.DataType) resp.DataType {
-
 	switch strings.ToLower(cmd) {
 	case "ping":
 		return resp.NewData(resp.String, "PONG")
@@ -176,7 +175,10 @@ func HandleLpop(key string, pops int) resp.DataType {
 	if err != nil {
 		return resp.NewData(resp.Error, err.Error())
 	}
+
 	if len(l) == 0 {
+		return resp.NewData(resp.BulkString, "")
+	} else if len(l) == 1 {
 		return resp.NewData(resp.BulkString, l)
 	} else {
 		return resp.NewData(resp.Array, l)
