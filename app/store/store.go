@@ -6,16 +6,16 @@ import (
 )
 
 type RedisStore struct {
-	Store map[string]StoreMember
+	Store map[string]*StoreMember
 }
 
-func (rs RedisStore) KeyExists(key string) bool {
-	_, ok := rs.Store[key]
-	return ok
+func (rs RedisStore) KeyExists(key string) (DataStructType, bool) {
+	m, ok := rs.Store[key]
+	return m.data.Type, ok
 }
 
 var R = RedisStore{
-	Store: make(map[string]StoreMember),
+	Store: make(map[string]*StoreMember),
 }
 
 func (rs RedisStore) removeMemberAfter(ttl_ms int64, key string) {
@@ -39,9 +39,12 @@ func (rs RedisStore) Get(key string) (string, bool) {
 	return *mem.data.String, ok
 }
 
-func (rs RedisStore) Rpush(key string, val []string) int {
-	var mem StoreMember
-	if rs.KeyExists(key) {
+func (rs RedisStore) Rpush(key string, val []string) (int, error) {
+	var mem *StoreMember
+	if t, ok := rs.KeyExists(key); ok {
+		if t != List {
+			return 0, fmt.Errorf("provided key '%s' does not hold a List", key)
+		}
 		mem = rs.Store[key]
 		mem.AssignValue(val)
 	} else {
@@ -50,5 +53,5 @@ func (rs RedisStore) Rpush(key string, val []string) int {
 		rs.Store[key] = mem
 	}
 	fmt.Printf("%+v\n", mem)
-	return len(mem.data.List)
+	return len(mem.data.List), nil
 }

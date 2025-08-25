@@ -9,7 +9,7 @@ import (
 type DataStructType int
 
 const (
-	String DataStructType = iota
+	String DataStructType = iota + 1
 	List
 )
 
@@ -24,8 +24,8 @@ type StoreMember struct {
 	data     DataStruct
 }
 
-func NewStoreMember(t DataStructType) StoreMember {
-	m := StoreMember{
+func NewStoreMember(t DataStructType) *StoreMember {
+	m := &StoreMember{
 		data: DataStruct{Type: t},
 	}
 	return m
@@ -47,10 +47,10 @@ func (m *StoreMember) AssignValue(val any) (err error) {
 	case List:
 		switch v := val.(type) {
 		case []string:
+			fmt.Printf("adding %+v\n", v)
 			m.data.List = append(m.data.List, v...)
 		default:
 			return fmt.Errorf("expected []string (or []any) for List type, got %T", val)
-
 		}
 	default:
 		return fmt.Errorf("unknown data type: %d", m.data.Type)

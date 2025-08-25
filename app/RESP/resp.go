@@ -42,6 +42,10 @@ func NewData(t byte, data any) DataType {
 		return d
 
 	default:
+		if err, ok := data.(error); ok {
+			d.Str = err.Error()
+			return d
+		}
 		log.Println("impossible branch: in NewDataType")
 		return d
 	}

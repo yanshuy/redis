@@ -88,7 +88,10 @@ func HandleCmd(cmd string, args []string) resp.DataType {
 		if len(args) < 2 {
 			return resp.NewData(resp.Error, "wrong number of arguments for 'rpush' command")
 		}
-		l := store.R.Rpush(args[0], args[1:])
+		l, err := store.R.Rpush(args[0], args[1:])
+		if err != nil {
+			return resp.NewData(resp.Error, err.Error())
+		}
 		return resp.NewData(resp.Integer, int64(l))
 
 	default:
