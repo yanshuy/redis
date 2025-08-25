@@ -79,7 +79,7 @@ func HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 		if key == "" {
 			return resp.NewData(resp.Error, "key must be a string length > 0")
 		}
-		return HandleLlen(key)
+		return HandleLpop(key)
 
 	case "lrange":
 		if len(args) != 3 {
