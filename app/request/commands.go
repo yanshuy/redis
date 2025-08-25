@@ -179,7 +179,7 @@ func HandleLpop(key string, pops int) resp.DataType {
 	if len(l) == 0 {
 		return resp.NewData(resp.BulkString, "")
 	} else if len(l) == 1 {
-		return resp.NewData(resp.BulkString, l)
+		return resp.NewData(resp.BulkString, l[0])
 	} else {
 		return resp.NewData(resp.Array, l)
 	}
