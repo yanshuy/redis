@@ -116,7 +116,7 @@ func BlpopDeque(item string) {
 	}
 }
 
-func (rs *RedisStore) Blpop(key string, timeout_s int64) (<-chan string, error) {
+func (rs *RedisStore) Blpop(key string, timeout_s float64) (<-chan string, error) {
 	item, err := rs.Lpop(key, 1)
 	if err != nil {
 		return nil, err
@@ -131,7 +131,8 @@ func (rs *RedisStore) Blpop(key string, timeout_s int64) (<-chan string, error) 
 	if timeout_s == 0 {
 		timeout_s = math.MaxInt32
 	}
-	timer := time.NewTimer(time.Duration(timeout_s) * time.Second)
+
+	timer := time.NewTimer(time.Duration(timeout_s * float64(time.Second)))
 	ch := BlpopAdd()
 
 	go func() {

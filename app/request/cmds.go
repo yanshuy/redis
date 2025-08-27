@@ -2,6 +2,7 @@ package request
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
@@ -220,10 +221,11 @@ func HandleBlpop(args []resp.DataType) resp.DataType {
 	if key == "" {
 		return resp.NewData(resp.Error, "key, val must be a string length > 0")
 	}
-	timeout_s, err := args[1].Integer()
+	timeout_s, err := strconv.ParseFloat(args[1].Str, 10)
 	if err != nil {
-		return resp.NewData(resp.Error, "expected 2 argument to be an integer for 'blpop' command")
+		return resp.NewData(resp.Error, "expected 2 argument to be an number for 'blpop' command")
 	}
+
 	msgChan, err := store.DB.Blpop(key, timeout_s)
 	if err != nil {
 		return resp.NewData(resp.Error, err.Error())
