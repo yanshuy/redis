@@ -109,6 +109,7 @@ func BlpopAdd() chan string {
 }
 
 func BlpopDeque(item string) {
+	fmt.Println("deque", item, len(blpopQueue), blpopQueue[0])
 	if len(blpopQueue) > 0 {
 		d := blpopQueue[0]
 		blpopQueue = blpopQueue[1:]
@@ -128,7 +129,7 @@ func (rs *RedisStore) Blpop(key string, timeout_s float64) (<-chan string, error
 		return msgChan, nil
 	}
 
-	if timeout_s == 0 {
+	if timeout_s <= 0 {
 		timeout_s = math.MaxInt32
 	}
 
