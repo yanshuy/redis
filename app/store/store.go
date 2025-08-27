@@ -1,31 +1,78 @@
 package store
 
 import (
-	"fmt"
-	"slices"
+	"sync"
 	"time"
 )
 
 type RedisStore struct {
-	Store map[string]*StoreMember
+	Store     map[string]*StoreMember
+	Listeners map[string][]chan struct{}
+	mu        sync.Mutex
 }
 
-func (rs RedisStore) Look(key string) (*StoreMember, bool) {
+func (rs *RedisStore) Look(key string) (*StoreMember, bool) {
 	m, ok := rs.Store[key]
 	return m, ok
 }
 
 var DB = RedisStore{
-	Store: make(map[string]*StoreMember),
+	Store:     make(map[string]*StoreMember),
+	Listeners: make(map[string][]chan struct{}),
+	mu:        sync.Mutex{},
 }
 
-func (rs RedisStore) removeMemberAfter(ttl_ms int64, key string) {
+func (rs *RedisStore) subscribeKey(key string) chan struct{} {
+	ch := make(chan struct{})
+	rs.Listeners[key] = append(rs.Listeners[key], ch)
+	return ch
+}
+
+func (rs *RedisStore) unsubscribeAll(key string) {
+	delete(rs.Listeners, key)
+}
+
+func (rs *RedisStore) unsubscribe(key string, ch chan struct{}) (ok bool) {
+	chans, ok := rs.Listeners[key]
+	if !ok {
+		return false
+	}
+	newChans := []chan struct{}{}
+	for _, c := range chans {
+		if c == ch {
+			ok = true
+			continue
+		}
+		newChans = append(newChans, c)
+	}
+	rs.Listeners[key] = newChans
+	if len(newChans) == 0 {
+		delete(rs.Listeners, key)
+	}
+	close(ch)
+	return ok
+}
+
+func (rs *RedisStore) notifySubscribers(key string, events ...func()) {
+	chans, ok := rs.Listeners[key]
+	if !ok {
+		return
+	}
+	for _, c := range chans {
+		c <- struct{}{}
+	}
+	for _, event := range events {
+		event()
+	}
+}
+
+func (rs *RedisStore) removeMemberAfter(ttl_ms int64, key string) {
 	timer := time.NewTimer(time.Duration(ttl_ms) * time.Millisecond)
 	<-timer.C
 	delete(rs.Store, key)
 }
 
-func (rs RedisStore) Set(key string, val string, ttl_ms int64) {
+func (rs *RedisStore) Set(key string, val string, ttl_ms int64) {
 	mem := NewStoreMember(String)
 	mem.AssignValue(val)
 	if ttl_ms > 0 {
@@ -35,97 +82,7 @@ func (rs RedisStore) Set(key string, val string, ttl_ms int64) {
 	rs.Store[key] = mem
 }
 
-func (rs RedisStore) Get(key string) (string, bool) {
+func (rs *RedisStore) Get(key string) (string, bool) {
 	mem, ok := rs.Store[key]
 	return mem.data.String, ok
-}
-
-func (rs RedisStore) Rpush(key string, val []string) (int, error) {
-	var mem *StoreMember
-	if m, ok := rs.Look(key); ok {
-		if m.data.Type != List {
-			return 0, fmt.Errorf("provided key '%s' holds some other data", key)
-		}
-		mem = rs.Store[key]
-		mem.AssignValue(val)
-	} else {
-		mem = NewStoreMember(List)
-		mem.AssignValue(val)
-		rs.Store[key] = mem
-	}
-	// fmt.Printf("%+v\n", mem)
-	return len(mem.data.List), nil
-}
-
-func (rs RedisStore) Lpush(key string, val []string) (int, error) {
-	var mem *StoreMember
-	if m, ok := rs.Look(key); ok {
-		if m.data.Type != List {
-			return 0, fmt.Errorf("provided key '%s' holds some other data", key)
-		}
-		mem = rs.Store[key]
-		slices.Reverse(val)
-		mem.data.List = append(val, mem.data.List...)
-	} else {
-		mem = NewStoreMember(List)
-		mem.AssignValue(val)
-		rs.Store[key] = mem
-	}
-	// fmt.Printf("%+v\n", mem)
-	return len(mem.data.List), nil
-}
-
-func (rs RedisStore) Lpop(key string, popCount int) ([]string, error) {
-	if m, ok := rs.Look(key); ok {
-		if m.data.Type != List {
-			return nil, fmt.Errorf("provided key '%s' does not hold a list", key)
-		}
-		popped := make([]string, 0, popCount)
-		for i := range popCount {
-			popped = append(popped, m.data.List[i])
-		}
-		m.data.List = m.data.List[popCount:]
-		return popped, nil
-	} else {
-		return []string{}, nil
-	}
-}
-
-func (rs RedisStore) Llen(key string) (int, error) {
-	if m, ok := rs.Look(key); ok {
-		if m.data.Type != List {
-			return 0, fmt.Errorf("provided key '%s' does not hold a list", key)
-		}
-		return len(m.data.List), nil
-	} else {
-		return 0, nil
-	}
-}
-
-func (rs RedisStore) Lrange(key string, startIdx int, endIdx int) ([]string, error) {
-	if m, ok := rs.Look(key); ok {
-		if m.data.Type != List {
-			return nil, fmt.Errorf("provided key '%s' holds some other data", key)
-		}
-		if startIdx < 0 {
-			startIdx = max(len(m.data.List)+startIdx, 0)
-		}
-		if endIdx < 0 {
-			endIdx = max(len(m.data.List)+endIdx, 0)
-		}
-		if startIdx >= endIdx || startIdx > len(m.data.List) {
-			return []string{}, nil
-		}
-		if endIdx >= len(m.data.List) {
-			endIdx = len(m.data.List) - 1
-		}
-		items := make([]string, 0, endIdx-startIdx)
-		for i := startIdx; i < endIdx+1; i++ {
-			items = append(items, m.data.List[i])
-		}
-		return items, nil
-
-	} else {
-		return []string{}, nil
-	}
 }

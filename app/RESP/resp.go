@@ -42,6 +42,9 @@ func NewData(t byte, data any) DataType {
 		d.Int = data.(int64)
 		return d
 	case Array:
+		if data == nil {
+			return d
+		}
 		elems := data.([]string)
 		for _, elem := range elems {
 			data := NewData(BulkString, elem)

@@ -187,6 +187,15 @@ func TestRequest_RPUSH_WrongArgTypes(t *testing.T) {
 	require.Contains(t, conn.Output(), "-ERROR")
 }
 
+func TestRequest_LPOP_Twice(t *testing.T) {
+	resetStore()
+	payload := "*10\r\n$5\r\nRPUSH\r\n$9\r\nblueberry\r\n$5\r\nmango\r\n$10\r\nstrawberry\r\n$5\r\napple\r\n$6\r\norange\r\n$9\r\npineapple\r\n$9\r\nblueberry\r\n$6\r\nbanana\r\n$4\r\npear\r\n*3\r\n$4\r\nLPOP\r\n$9\r\nblueberry\r\n$1\r\n2\r\n"
+	conn := newRW(payload)
+	_, err := ReadAndHandleRequest(conn)
+	require.NoError(t, err)
+	fmt.Println(conn.Output())
+}
+
 func TestRequest_LRANGE_WrongArity(t *testing.T) {
 	resetStore()
 	// LRANGE mylist 0 1 2 (too many)

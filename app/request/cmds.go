@@ -3,7 +3,6 @@ package request
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
@@ -99,6 +98,9 @@ func HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 			return resp.NewData(resp.Error, "key, val must be a string length > 0")
 		}
 		return HandleLrange(key, args[1:])
+
+	case "blpop":
+		return HandleBlpop(args)
 
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd)
@@ -210,16 +212,25 @@ func HandleLrange(key string, args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.Array, elems)
 }
 
-func HandleBlpop(key string, timeout_s time.Duration) resp.DataType {
-	timer := time.NewTimer(timeout_s * time.Second)
-	elemChan := make(chan string)
-
-	for {
-		select {
-		case elem := <-elemChan:
-			return resp.NewData(resp.BulkString, elem)
-		case <-timer.C:
-			return resp.NewData(resp.BulkString, "")
-		}
+func HandleBlpop(args []resp.DataType) resp.DataType {
+	if len(args) != 2 {
+		return resp.NewData(resp.Error, "wrong number of arguments for 'blpop' command")
 	}
+	key := args[0].Str
+	if key == "" {
+		return resp.NewData(resp.Error, "key, val must be a string length > 0")
+	}
+	timeout_s, err := args[1].Integer()
+	if err != nil {
+		return resp.NewData(resp.Error, "expected 2 argument to be an integer for 'blpop' command")
+	}
+	msgChan, err := store.DB.Blpop(key, timeout_s)
+	if err != nil {
+		return resp.NewData(resp.Error, err.Error())
+	}
+	s := <-msgChan
+	if s == "" {
+		return resp.NewData(resp.BulkString, "")
+	}
+	return resp.NewData(resp.Array, []string{key, s})
 }
