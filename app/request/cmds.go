@@ -239,3 +239,33 @@ func HandleXadd(args []resp.DataType) resp.DataType {
 	}
 	return resp.NewData(resp.BulkString, s)
 }
+
+func HandleXrange(args []resp.DataType) resp.DataType {
+	if len(args) != 3 {
+		return resp.NewData(resp.Error, "wrong number of arguments for 'xadd' command")
+	}
+	key := args[0].Str
+	if key == "" {
+		return resp.NewData(resp.Error, "key, val must be a string length > 0")
+	}
+	startStr := args[1].Str
+	if key == "" {
+		return resp.NewData(resp.Error, "invalid start argument")
+	}
+	endStr := args[2].Str
+	if key == "" {
+		return resp.NewData(resp.Error, "invalid start argument")
+	}
+	entries, err := store.DB.XRange(key, startStr, endStr)
+	if err != nil {
+		return resp.NewData(resp.Error, err.Error())
+	}
+
+	res := resp.NewData(resp.Array)
+	for _, entry := range entries {
+		id := resp.NewData(resp.BulkString, fmt.Sprintf("%d-%d", entry.Id.MS, entry.Id.Seq))
+		fields := resp.NewData(resp.Array, entry.Fields)
+		res.Arr = append(res.Arr, id, fields)
+	}
+	return res
+}

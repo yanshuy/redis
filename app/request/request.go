@@ -109,6 +109,9 @@ func HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 	case "xadd":
 		return HandleXadd(args)
 
+	case "xrange":
+		return HandleXrange(args)
+
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd)
 		return resp.NewData(resp.Error, msg)

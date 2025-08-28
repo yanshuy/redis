@@ -29,37 +29,40 @@ func (d *DataType) Is(dataType byte) bool {
 	return d.Type == dataType
 }
 
-func NewData(t byte, data any) DataType {
-	d := DataType{Type: t}
-	switch t {
-	case Error:
-		d.Str = data.(string)
-		return d
-	case String, BulkString:
-		d.Str = data.(string)
-		return d
-	case Integer:
-		d.Int = data.(int64)
-		return d
-	case Array:
-		if data == nil {
+func NewData(t byte, data ...any) DataType {
+	for _, item := range data {
+		d := DataType{Type: t}
+		switch t {
+		case Error:
+			d.Str = item.(string)
 			return d
-		}
-		elems := data.([]string)
-		for _, elem := range elems {
-			data := NewData(BulkString, elem)
-			d.Arr = append(d.Arr, data)
-		}
-		return d
+		case String, BulkString:
+			d.Str = item.(string)
+			return d
+		case Integer:
+			d.Int = item.(int64)
+			return d
+		case Array:
+			if data == nil {
+				return d
+			}
+			elems := item.([]string)
+			for _, elem := range elems {
+				data := NewData(BulkString, elem)
+				d.Arr = append(d.Arr, data)
+			}
+			return d
 
-	default:
-		if err, ok := data.(error); ok {
-			d.Str = err.Error()
+		default:
+			if err, ok := item.(error); ok {
+				d.Str = err.Error()
+				return d
+			}
+			log.Fatal("unknown data type encountered:", string(t))
 			return d
 		}
-		log.Fatal("unknown data type encountered:", string(t))
-		return d
 	}
+	return DataType{}
 }
 
 func (d *DataType) String() string {

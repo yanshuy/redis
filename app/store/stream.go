@@ -8,11 +8,36 @@ import (
 	"time"
 )
 
+type StreamID struct {
+	MS  int64
+	Seq int
+}
+
+type StreamEntry struct {
+	Id     StreamID
+	Fields []string
+}
+
+type StreamObj struct {
+	LastID  StreamID
+	Entries []StreamEntry
+}
+
+func (s StreamObj) FindEntry(id StreamID) *StreamEntry {
+	for i, entry := range s.Entries {
+		if entry.Id == id {
+			return &s.Entries[i]
+		}
+	}
+	return nil
+}
+
 func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (s string, err error) {
 	m, exists := rs.Look(key)
+	stream := m.data.Stream
 
 	var time_ms int64
-	var sqNo int
+	var seqNo int
 
 	if stream_key == "*" {
 		time_ms = time.Now().Unix() * 1000
@@ -22,61 +47,112 @@ func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (s string,
 			return "", errors.New("invalid stream key")
 		}
 		time_ms, err = strconv.ParseInt(parts[0], 10, 64)
-		if err != nil {
+		if err != nil || time_ms < 0 {
 			return "", errors.New("invalid stream key")
 		}
 		if parts[1] == "*" {
-			if exists {
-				for _, item := range m.data.Stream {
-					if item.time_ms == time_ms {
-						sqNo = item.sequenceNo + 1
-					}
-				}
+			if stream.LastID.MS == time_ms {
+				seqNo = stream.LastID.Seq + 1
 			}
 		} else {
-			sqNo, err = strconv.Atoi(parts[1])
-			if err != nil {
+			seqNo, err = strconv.Atoi(parts[1])
+			if err != nil || seqNo < 0 {
 				return "", errors.New("invalid stream key")
 			}
 		}
 	}
 
-	if time_ms < 0 || sqNo < 0 {
+	if time_ms == 0 && seqNo == 0 {
 		return "", errors.New("The ID specified in XADD must be greater than 0-0")
 	}
-	if exists {
-		if time_ms == 0 && sqNo == 0 { // chutiya codecrafters case
-			return "", errors.New("The ID specified in XADD must be greater than 0-0")
+
+	streamId := StreamID{time_ms, seqNo}
+	if !exists {
+		m := rs.NewStoreMember(key, Stream)
+		s := &StreamObj{
+			LastID: streamId,
+			Entries: []StreamEntry{
+				{streamId, key_vals},
+			},
 		}
-		last := m.data.Stream[len(m.data.Stream)-1]
-		if time_ms < last.time_ms || (time_ms == last.time_ms && sqNo <= last.sequenceNo) {
-			return "", errors.New("The ID specified in XADD is equal or smaller than the target stream top item")
+		m.data.Stream = s
+		return fmt.Sprintf("%d-%d", time_ms, seqNo), nil
+	}
+
+	if time_ms < stream.LastID.MS || (time_ms == stream.LastID.MS && seqNo <= stream.LastID.Seq) {
+		return "", errors.New("The ID specified in XADD is equal or smaller than the target stream top item")
+	}
+	stream.Entries = append(stream.Entries, StreamEntry{streamId, key_vals})
+	return fmt.Sprintf("%d-%d", time_ms, seqNo), nil
+}
+
+func (rs *RedisStore) XRange(key string, startStr string, endStr string) ([]StreamEntry, error) {
+	m, exists := rs.Look(key)
+	stream := m.data.Stream
+	if !exists {
+		return nil, nil
+	}
+	var start, end int64
+	var startSeq, endSeq int
+	startParts := strings.Split(startStr, "-")
+	endParts := strings.Split(endStr, "-")
+	if len(startParts) != len(endParts) || len(startParts) > 2 {
+		return nil, errors.New("invalid arguments")
+	}
+
+	start, err := strconv.ParseInt(startParts[0], 10, 64)
+	if err != nil {
+		return nil, errors.New("invalid arguments")
+	}
+	end, err = strconv.ParseInt(endParts[0], 10, 64)
+	if err != nil {
+		return nil, errors.New("invalid arguments")
+	}
+	if start > end {
+		return nil, nil
+	}
+
+	var entries []StreamEntry
+	for _, entry := range stream.Entries {
+		if entry.Id.MS >= start && entry.Id.MS <= end {
+			entries = append(entries, entry)
 		}
 	}
-	if time_ms == 0 {
-		sqNo = 1
-	}
 
-	entry := StreamEntry{
-		sequenceNo: sqNo,
-		time_ms:    time_ms,
-	}
-
-	if exists {
-		m.data.Stream = append(m.data.Stream, entry)
-	} else {
-		mNew := rs.NewStoreMember(key, Stream)
-		mNew.data.Stream = append(mNew.data.Stream, entry)
-	}
-
-	if len(key_vals) > 1 {
-		entry.fields = make(map[string]string)
-		for i := 0; i < len(key_vals); i += 2 {
-			key := key_vals[i]
-			val := key_vals[i+1]
-			entry.fields[key] = val
+	if len(startParts) == 2 {
+		startSeq, err = strconv.Atoi(startParts[1])
+		if err != nil {
+			return nil, errors.New("invalid arguments")
 		}
-	}
+		endSeq, err = strconv.Atoi(endParts[1])
+		if err != nil {
+			return nil, errors.New("invalid arguments")
+		}
 
-	return fmt.Sprintf("%d-%d", time_ms, sqNo), nil
+		lo := 0
+		for lo < len(entries) {
+			e := entries[lo]
+			if e.Id.MS == start && e.Id.Seq < startSeq {
+				lo++
+			} else if e.Id.MS < start {
+				lo++
+			} else {
+				break
+			}
+		}
+		hi := len(entries) - 1
+		for hi >= lo {
+			e := entries[hi]
+			if e.Id.MS == end && e.Id.Seq > endSeq {
+				hi--
+			} else if e.Id.MS > end {
+				hi--
+			} else {
+				break
+			}
+		}
+		entries = entries[lo : hi+1]
+		fmt.Printf("result %+v \n", entries)
+	}
+	return entries, nil
 }

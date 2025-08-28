@@ -15,14 +15,8 @@ const (
 type Data struct {
 	Type   DataType
 	String string
-	Stream []StreamEntry
+	Stream *StreamObj
 	List   []string
-}
-
-type StreamEntry struct {
-	sequenceNo int
-	time_ms    int64
-	fields     map[string]string
 }
 
 type StoreMember struct {
