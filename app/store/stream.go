@@ -16,17 +16,21 @@ func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) error {
 		return errors.New("invalid stream key")
 	}
 	var sqNo int
+	sqChanged := false
 	m, exists := rs.Look(key)
 	if exists && parts[0] == "*" {
 		for _, item := range m.data.Stream {
 			if item.time_ms == time_ms {
 				sqNo = item.sequenceNo + 1
+				sqChanged = true
 			}
 		}
 	}
-	sqNo, err = strconv.Atoi(parts[1])
-	if err != nil {
-		return errors.New("invalid stream key")
+	if !sqChanged {
+		sqNo, err = strconv.Atoi(parts[1])
+		if err != nil {
+			return errors.New("invalid stream key")
+		}
 	}
 	if time_ms == 0 {
 		sqNo = 1
