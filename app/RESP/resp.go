@@ -62,24 +62,24 @@ func NewData(t byte, data any) DataType {
 	}
 }
 
-// func (d *DataType) String() string {
-// 	switch d.Type {
-// 	case Error:
-// 		return d.Str
-// 	case String, BulkString:
-// 		return d.Str
-// 	case Integer:
-// 		return strconv.Itoa(int(d.Int))
-// 	case Array:
-// 		str := ""
-// 		for _, sd := range d.Arr {
-// 			str += sd.String()
-// 		}
-// 		return str
-// 	default:
-// 		return ""
-// 	}
-// }
+func (d *DataType) String() string {
+	switch d.Type {
+	case Error:
+		return d.Str
+	case String, BulkString:
+		return d.Str
+	case Integer:
+		return strconv.Itoa(int(d.Int))
+	case Array:
+		str := ""
+		for _, sd := range d.Arr {
+			str += sd.String()
+		}
+		return str
+	default:
+		return ""
+	}
+}
 
 func (d *DataType) Integer() (int64, error) {
 	switch d.Type {

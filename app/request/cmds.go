@@ -1,6 +1,7 @@
 package request
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -205,4 +206,36 @@ func HandleType(args []resp.DataType) resp.DataType {
 	}
 	t := store.DB.Type(key)
 	return resp.NewData(resp.String, t)
+}
+
+func HandleXadd(args []resp.DataType) resp.DataType {
+	if len(args) < 2 {
+		return resp.NewData(resp.Error, "wrong number of arguments for 'xadd' command")
+	}
+	key := args[0].Str
+	if strings.ToLower(key) != "stream_key" {
+		return resp.NewData(resp.Error, "first argument must be a stream_key")
+	}
+	stream_key := args[1].Str
+	if key == "" {
+		return resp.NewData(resp.Error, "val must be string")
+	}
+	rest := args[2:]
+	key_vals := make([]string, 0, len(args[2:]))
+	for i := 0; i < len(rest); i += 2 {
+		key := rest[i]
+		if key.Str == "" {
+			return resp.NewData(resp.Error, "key, val must be a string length > 0")
+		}
+		if i+1 > len(rest) {
+			return resp.NewData(resp.Error, fmt.Sprintf("no value for the key %s specified", key.Str))
+		}
+		val := rest[i+1]
+		if val.Str == "" {
+			return resp.NewData(resp.Error, "key, val must be a string length > 0")
+		}
+		key_vals = append(key_vals, key.Str, val.Str)
+	}
+	store.DB.Xadd(stream_key, key_vals)
+	return resp.NewData(resp.BulkString, stream_key)
 }

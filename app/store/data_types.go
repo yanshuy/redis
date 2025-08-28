@@ -6,15 +6,16 @@ import (
 	"time"
 )
 
-type DataStructType int
+type DataType int
 
 const (
-	String DataStructType = iota + 1
+	String DataType = iota + 1
 	List
+	Stream
 )
 
 type DataStruct struct {
-	Type   DataStructType
+	Type   DataType
 	String string
 	List   []string
 }
@@ -24,7 +25,7 @@ type StoreMember struct {
 	data     DataStruct
 }
 
-func NewStoreMember(t DataStructType) *StoreMember {
+func NewStoreMember(t DataType) *StoreMember {
 	m := &StoreMember{
 		data: DataStruct{Type: t},
 	}

@@ -50,6 +50,8 @@ func (rs *RedisStore) Type(key string) string {
 			return "list"
 		case String:
 			return "string"
+		case Stream:
+			return "stream"
 		}
 	}
 	return "none"
