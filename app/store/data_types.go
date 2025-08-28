@@ -17,6 +17,7 @@ const (
 type DataStruct struct {
 	Type   DataType
 	String string
+	Stream []map[string]string
 	List   []string
 }
 

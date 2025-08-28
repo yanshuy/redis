@@ -213,12 +213,9 @@ func HandleXadd(args []resp.DataType) resp.DataType {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'xadd' command")
 	}
 	key := args[0].Str
-	if strings.ToLower(key) != "stream_key" {
-		return resp.NewData(resp.Error, "first argument must be a stream_key")
-	}
 	stream_key := args[1].Str
-	if key == "" {
-		return resp.NewData(resp.Error, "val must be string")
+	if key == "" || stream_key == "" {
+		return resp.NewData(resp.Error, "key, val must be a string length > 0")
 	}
 	rest := args[2:]
 	key_vals := make([]string, 0, len(args[2:]))
@@ -236,6 +233,6 @@ func HandleXadd(args []resp.DataType) resp.DataType {
 		}
 		key_vals = append(key_vals, key.Str, val.Str)
 	}
-	store.DB.Xadd(stream_key, key_vals)
+	store.DB.Xadd(key, stream_key, key_vals)
 	return resp.NewData(resp.BulkString, stream_key)
 }
