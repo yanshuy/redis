@@ -15,7 +15,7 @@ func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (s string,
 	var sqNo int
 
 	if stream_key == "*" {
-		time_ms = time.Now().Unix()
+		time_ms = time.Now().Unix() * 1000
 	} else {
 		parts := strings.Split(stream_key, "-")
 		if len(parts) != 2 {
