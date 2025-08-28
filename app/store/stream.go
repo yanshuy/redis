@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -26,6 +27,7 @@ func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) error {
 			}
 		}
 	}
+	fmt.Println(sqChanged, sqNo, time_ms)
 	if !sqChanged {
 		sqNo, err = strconv.Atoi(parts[1])
 		if err != nil {
