@@ -81,7 +81,7 @@ func (rs *RedisStore) Lrange(key string, startIdx int, endIdx int) ([]string, er
 		if endIdx < 0 {
 			endIdx = max(len(m.data.List)+endIdx, 0)
 		}
-		if startIdx >= endIdx || startIdx > len(m.data.List) {
+		if startIdx > endIdx || startIdx > len(m.data.List) {
 			return nil, nil
 		}
 		if endIdx >= len(m.data.List) {
