@@ -52,6 +52,8 @@ func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (s string,
 		if parts[1] == "*" {
 			if exists && m.data.Stream.LastID.MS == time_ms {
 				seqNo = m.data.Stream.LastID.Seq + 1
+			} else if time_ms == 0 {
+				seqNo = 1
 			}
 		} else {
 			seqNo, err = strconv.Atoi(parts[1])
@@ -80,6 +82,7 @@ func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (s string,
 	if time_ms < stream.LastID.MS || (time_ms == stream.LastID.MS && seqNo <= stream.LastID.Seq) {
 		return "", errors.New("The ID specified in XADD is equal or smaller than the target stream top item")
 	}
+	stream.LastID = streamId
 	stream.Entries = append(stream.Entries, StreamEntry{streamId, key_vals})
 	return fmt.Sprintf("%d-%d", time_ms, seqNo), nil
 }
