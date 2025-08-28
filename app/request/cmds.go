@@ -21,25 +21,10 @@ func HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 		return args[0]
 
 	case "get":
-		if len(args) != 1 {
-			return resp.NewData(resp.Error, "wrong number of arguments for 'get' command")
-		}
-		key := args[0].Str
-		if key == "" {
-			return resp.NewData(resp.Error, "key must be a string length > 0")
-		}
-		return HandleCmdGet(key)
+		return HandleCmdGet(args)
 
 	case "set":
-		if len(args) < 2 {
-			return resp.NewData(resp.Error, "wrong number of arguments for 'set' command")
-		}
-		key := args[0].Str
-		val := args[1].Str
-		if key == "" || val == "" {
-			return resp.NewData(resp.Error, "key, val must be a string length > 0")
-		}
-		return HandleCmdSet(key, val, args[2:])
+		return HandleCmdSet(args)
 
 	case "rpush":
 		if len(args) < 2 {
@@ -109,7 +94,14 @@ func HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 	}
 }
 
-func HandleCmdGet(key string) resp.DataType {
+func HandleCmdGet(args []resp.DataType) resp.DataType {
+	if len(args) != 1 {
+		return resp.NewData(resp.Error, "wrong number of arguments for 'get' command")
+	}
+	key := args[0].Str
+	if key == "" {
+		return resp.NewData(resp.Error, "key must be a string length > 0")
+	}
 	if val, ok := store.DB.Get(key); ok {
 		return resp.NewData(resp.BulkString, val)
 	} else {
@@ -117,13 +109,21 @@ func HandleCmdGet(key string) resp.DataType {
 	}
 }
 
-func HandleCmdSet(key, val string, args []resp.DataType) resp.DataType {
+func HandleCmdSet(args []resp.DataType) resp.DataType {
+	if len(args) < 2 {
+		return resp.NewData(resp.Error, "wrong number of arguments for 'set' command")
+	}
+	key := args[0].Str
+	val := args[1].Str
+	if key == "" || val == "" {
+		return resp.NewData(resp.Error, "key, val must be a string length > 0")
+	}
 	var expiry int64
-	if len(args) >= 2 {
-		arg := args[0].Str
+	if len(args) >= 4 {
+		arg := args[2].Str
 		switch strings.ToLower(arg) {
 		case "px", "ex":
-			exp, err := args[1].Integer()
+			exp, err := args[3].Integer()
 			if err != nil {
 				return resp.NewData(resp.Error, "wrong expiry time expected a number")
 			}
@@ -227,6 +227,7 @@ func HandleBlpop(args []resp.DataType) resp.DataType {
 	}
 
 	msgChan, err := store.DB.Blpop(key, timeout_s)
+	defer close(msgChan)
 	if err != nil {
 		return resp.NewData(resp.Error, err.Error())
 	}

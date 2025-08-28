@@ -20,7 +20,7 @@ func (rs *RedisStore) Rpush(key string, val []string) (int, error) {
 		mem.AssignValue(val)
 		rs.Store[key] = mem
 	}
-	BlpopDeque(mem.data.List[0])
+	rs.NotifyBlockers(key)
 	return len(mem.data.List), nil
 }
 
@@ -38,7 +38,7 @@ func (rs *RedisStore) Lpush(key string, val []string) (int, error) {
 		mem.AssignValue(val)
 		rs.Store[key] = mem
 	}
-	BlpopDeque(mem.data.List[0])
+	rs.NotifyBlockers(key)
 	return len(mem.data.List), nil
 }
 
@@ -100,32 +100,16 @@ func (rs *RedisStore) Lrange(key string, startIdx int, endIdx int) ([]string, er
 	}
 }
 
-var blpopQueue = []chan string{}
-
-func BlpopAdd() chan string {
-	c := make(chan string)
-	blpopQueue = append(blpopQueue, c)
-	return c
-}
-
-func BlpopDeque(item string) {
-	fmt.Println("deque", item, len(blpopQueue), blpopQueue[0])
-	if len(blpopQueue) > 0 {
-		d := blpopQueue[0]
-		blpopQueue = blpopQueue[1:]
-		d <- item
-	}
-}
-
-func (rs *RedisStore) Blpop(key string, timeout_s float64) (<-chan string, error) {
+func (rs *RedisStore) Blpop(key string, timeout_s float64) (chan string, error) {
 	item, err := rs.Lpop(key, 1)
 	if err != nil {
 		return nil, err
 	}
+
 	msgChan := make(chan string)
+
 	if len(item) == 1 {
 		msgChan <- item[0]
-		close(msgChan)
 		return msgChan, nil
 	}
 
@@ -134,23 +118,20 @@ func (rs *RedisStore) Blpop(key string, timeout_s float64) (<-chan string, error
 	}
 
 	timer := time.NewTimer(time.Duration(timeout_s * float64(time.Second)))
-	ch := BlpopAdd()
+	ch := make(chan struct{})
+	rs.AddBlocker(key, ch)
 
 	go func() {
-		defer close(msgChan)
 		defer timer.Stop()
 		select {
-		case item := <-ch:
-			msgChan <- item
-			rs.mu.Lock()
-			rs.Lpop(key, 1)
-			rs.mu.Unlock()
+		case <-ch:
+			item, _ := rs.Lpop(key, 1)
+			msgChan <- item[0]
 			return
 		case <-timer.C:
 			msgChan <- ""
 			return
 		}
 	}()
-
 	return msgChan, nil
 }
