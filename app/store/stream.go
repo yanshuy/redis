@@ -5,32 +5,39 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
-func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (string, error) {
-	parts := strings.Split(stream_key, "-")
-	if len(parts) != 2 {
-		return "", errors.New("invalid stream key")
-	}
-	time_ms, err := strconv.ParseInt(parts[0], 10, 64)
-	if err != nil {
-		return "", errors.New("invalid stream key")
-	}
-
+func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (s string, err error) {
 	m, exists := rs.Look(key)
+
+	var time_ms int64
 	var sqNo int
-	if parts[1] == "*" {
-		if exists {
-			for _, item := range m.data.Stream {
-				if item.time_ms == time_ms {
-					sqNo = item.sequenceNo + 1
-				}
-			}
-		}
+
+	if stream_key == "*" {
+		time_ms = time.Now().Unix()
 	} else {
-		sqNo, err = strconv.Atoi(parts[1])
+		parts := strings.Split(stream_key, "-")
+		if len(parts) != 2 {
+			return "", errors.New("invalid stream key")
+		}
+		time_ms, err = strconv.ParseInt(parts[0], 10, 64)
 		if err != nil {
 			return "", errors.New("invalid stream key")
+		}
+		if parts[1] == "*" {
+			if exists {
+				for _, item := range m.data.Stream {
+					if item.time_ms == time_ms {
+						sqNo = item.sequenceNo + 1
+					}
+				}
+			}
+		} else {
+			sqNo, err = strconv.Atoi(parts[1])
+			if err != nil {
+				return "", errors.New("invalid stream key")
+			}
 		}
 	}
 
