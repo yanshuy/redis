@@ -102,7 +102,7 @@ func (d *DataType) ToResponse() []byte {
 	case Error:
 		res := make([]byte, 0, 1+6+len(d.Str)+2)
 		res = append(res, Error)
-		res = fmt.Append(res, "ERROR ")
+		res = fmt.Append(res, "ERR ")
 		res = fmt.Append(res, d.Str+crlf)
 		return res
 

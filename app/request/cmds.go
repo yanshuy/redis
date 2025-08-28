@@ -233,6 +233,9 @@ func HandleXadd(args []resp.DataType) resp.DataType {
 		}
 		key_vals = append(key_vals, key.Str, val.Str)
 	}
-	store.DB.Xadd(key, stream_key, key_vals)
+	err := store.DB.Xadd(key, stream_key, key_vals)
+	if err != nil {
+		return resp.NewData(resp.Error, err.Error())
+	}
 	return resp.NewData(resp.BulkString, stream_key)
 }

@@ -14,11 +14,10 @@ func (rs *RedisStore) Rpush(key string, val []string) (int, error) {
 			return 0, fmt.Errorf("provided key '%s' holds some other data", key)
 		}
 		mem = m
-		m.AssignValue(val)
+		mem.data.List = append(mem.data.List, val...)
 	} else {
-		mem = NewStoreMember(List)
-		mem.AssignValue(val)
-		rs.Store[key] = mem
+		mem = rs.NewStoreMember(key, List)
+		mem.data.List = append(mem.data.List, val...)
 	}
 	rs.NotifyListener(key)
 	return len(mem.data.List), nil
@@ -34,9 +33,8 @@ func (rs *RedisStore) Lpush(key string, val []string) (int, error) {
 		slices.Reverse(val)
 		m.data.List = append(val, m.data.List...)
 	} else {
-		mem = NewStoreMember(List)
-		mem.AssignValue(val)
-		rs.Store[key] = mem
+		mem = rs.NewStoreMember(key, List)
+		mem.data.List = append(mem.data.List, val...)
 	}
 	rs.NotifyListener(key)
 	return len(mem.data.List), nil

@@ -29,13 +29,12 @@ func (rs *RedisStore) RemoveMemberAfter(ttl_ms int64, key string) {
 }
 
 func (rs *RedisStore) Set(key string, val string, ttl_ms int64) {
-	mem := NewStoreMember(String)
-	mem.AssignValue(val)
+	mem := rs.NewStoreMember(key, String)
+	mem.data.String = val
 	if ttl_ms > 0 {
 		mem.ExpiryAt = time.Now().Add(time.Duration(ttl_ms) * time.Millisecond)
 		go rs.RemoveMemberAfter(ttl_ms, key)
 	}
-	rs.Store[key] = mem
 }
 
 func (rs *RedisStore) Get(key string) (string, bool) {
