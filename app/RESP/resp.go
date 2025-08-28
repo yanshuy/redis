@@ -46,23 +46,29 @@ func NewData(t byte, data ...any) DataType {
 			if data == nil {
 				return d
 			}
-			elems := item.([]string)
-			for _, elem := range elems {
-				data := NewData(BulkString, elem)
-				d.Arr = append(d.Arr, data)
+			switch v := item.(type) {
+			case []string:
+				for _, elem := range v {
+					s := NewData(BulkString, elem)
+					d.Arr = append(d.Arr, s)
+				}
+			case string:
+				s := NewData(BulkString, v)
+				d.Arr = append(d.Arr, s)
 			}
 			return d
 
 		default:
 			if err, ok := item.(error); ok {
+				d.Type = Error
 				d.Str = err.Error()
 				return d
 			}
-			log.Fatal("unknown data type encountered:", string(t))
+			log.Fatal("unknown data type encountered:", item)
 			return d
 		}
 	}
-	return DataType{}
+	return DataType{Type: t}
 }
 
 func (d *DataType) String() string {

@@ -34,7 +34,6 @@ func (s StreamObj) FindEntry(id StreamID) *StreamEntry {
 
 func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (s string, err error) {
 	m, exists := rs.Look(key)
-	stream := m.data.Stream
 
 	var time_ms int64
 	var seqNo int
@@ -51,8 +50,8 @@ func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (s string,
 			return "", errors.New("invalid stream key")
 		}
 		if parts[1] == "*" {
-			if stream.LastID.MS == time_ms {
-				seqNo = stream.LastID.Seq + 1
+			if exists && m.data.Stream.LastID.MS == time_ms {
+				seqNo = m.data.Stream.LastID.Seq + 1
 			}
 		} else {
 			seqNo, err = strconv.Atoi(parts[1])
@@ -70,15 +69,14 @@ func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (s string,
 	if !exists {
 		m := rs.NewStoreMember(key, Stream)
 		s := &StreamObj{
-			LastID: streamId,
-			Entries: []StreamEntry{
-				{streamId, key_vals},
-			},
+			LastID:  streamId,
+			Entries: []StreamEntry{{streamId, key_vals}},
 		}
 		m.data.Stream = s
 		return fmt.Sprintf("%d-%d", time_ms, seqNo), nil
 	}
 
+	stream := m.data.Stream
 	if time_ms < stream.LastID.MS || (time_ms == stream.LastID.MS && seqNo <= stream.LastID.Seq) {
 		return "", errors.New("The ID specified in XADD is equal or smaller than the target stream top item")
 	}
@@ -152,7 +150,6 @@ func (rs *RedisStore) XRange(key string, startStr string, endStr string) ([]Stre
 			}
 		}
 		entries = entries[lo : hi+1]
-		fmt.Printf("result %+v \n", entries)
 	}
 	return entries, nil
 }
