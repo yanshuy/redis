@@ -6,9 +6,9 @@ import (
 )
 
 type RedisStore struct {
-	Store    map[string]*StoreMember
-	Blockers map[string][]chan struct{}
-	mu       sync.Mutex
+	Store     map[string]*StoreMember
+	Listeners map[string][]chan struct{}
+	mu        sync.Mutex
 }
 
 func (rs *RedisStore) Look(key string) (*StoreMember, bool) {
@@ -17,54 +17,10 @@ func (rs *RedisStore) Look(key string) (*StoreMember, bool) {
 }
 
 var DB = RedisStore{
-	Store:    make(map[string]*StoreMember),
-	Blockers: make(map[string][]chan struct{}),
-	mu:       sync.Mutex{},
+	Store:     make(map[string]*StoreMember),
+	Listeners: make(map[string][]chan struct{}),
+	mu:        sync.Mutex{},
 }
-
-// func (rs *RedisStore) subscribeKey(key string) chan struct{} {
-// 	ch := make(chan struct{})
-// 	rs.Listeners[key] = append(rs.Listeners[key], ch)
-// 	return ch
-// }
-
-// func (rs *RedisStore) unsubscribeAll(key string) {
-// 	delete(rs.Listeners, key)
-// }
-
-// func (rs *RedisStore) unsubscribe(key string, ch chan struct{}) (ok bool) {
-// 	chans, ok := rs.Listeners[key]
-// 	if !ok {
-// 		return false
-// 	}
-// 	newChans := []chan struct{}{}
-// 	for _, c := range chans {
-// 		if c == ch {
-// 			ok = true
-// 			continue
-// 		}
-// 		newChans = append(newChans, c)
-// 	}
-// 	rs.Listeners[key] = newChans
-// 	if len(newChans) == 0 {
-// 		delete(rs.Listeners, key)
-// 	}
-// 	close(ch)
-// 	return ok
-// }
-
-// func (rs *RedisStore) notifySubscribers(key string, events ...func()) {
-// 	chans, ok := rs.Listeners[key]
-// 	if !ok {
-// 		return
-// 	}
-// 	for _, event := range events {
-// 		event()
-// 	}
-// 	for _, c := range chans {
-// 		c <- struct{}{}
-// 	}
-// }
 
 func (rs *RedisStore) RemoveMemberAfter(ttl_ms int64, key string) {
 	timer := time.NewTimer(time.Duration(ttl_ms) * time.Millisecond)
@@ -87,17 +43,19 @@ func (rs *RedisStore) Get(key string) (string, bool) {
 	return mem.data.String, ok
 }
 
-func (rs *RedisStore) AddBlocker(key string, c chan struct{}) {
+func (rs *RedisStore) subscribe(key string) chan struct{} {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
-	rs.Blockers[key] = append(rs.Blockers[key], c)
+	ch := make(chan struct{})
+	rs.Listeners[key] = append(rs.Listeners[key], ch)
+	return ch
 }
 
-func (rs *RedisStore) RemovBlocker(key string, ch chan struct{}) (ok bool) {
+func (rs *RedisStore) unsubscribe(key string, ch chan struct{}) (ok bool) {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 
-	chans, ok := rs.Blockers[key]
+	chans, ok := rs.Listeners[key]
 	if !ok {
 		return false
 	}
@@ -110,23 +68,35 @@ func (rs *RedisStore) RemovBlocker(key string, ch chan struct{}) (ok bool) {
 	}
 
 	if len(chans) == 0 {
-		delete(rs.Blockers, key)
+		delete(rs.Listeners, key)
 	}
 	close(ch)
 	return ok
 }
 
-func (rs *RedisStore) NotifyBlockers(key string) {
+// func (rs *RedisStore) notifySubscribers(key string, events ...func()) {
+// 	chans, ok := rs.Listeners[key]
+// 	if !ok {
+// 		return
+// 	}
+// 	for _, event := range events {
+// 		event()
+// 	}
+// 	for _, c := range chans {
+// 		c <- struct{}{}
+// 	}
+// }
+
+func (rs *RedisStore) NotifyListener(key string) {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
-	chans, ok := rs.Blockers[key]
+	chans, ok := rs.Listeners[key]
 	if !ok {
 		return
 	}
 
 	ch := chans[0]
-	rs.Blockers[key] = chans[1:]
+	rs.Listeners[key] = chans[1:]
 
 	ch <- struct{}{}
-	close(ch)
 }

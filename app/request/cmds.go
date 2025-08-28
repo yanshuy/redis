@@ -27,63 +27,19 @@ func HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 		return HandleCmdSet(args)
 
 	case "rpush":
-		if len(args) < 2 {
-			return resp.NewData(resp.Error, "wrong number of arguments for 'rpush' command")
-		}
-		key := args[0].Str
-		if key == "" {
-			return resp.NewData(resp.Error, "key must be a string length > 0")
-		}
-		return HandleRpush(key, args[1:])
+		return HandleRpush(args)
 
 	case "lpush":
-		if len(args) < 2 {
-			return resp.NewData(resp.Error, "wrong number of arguments for 'lpush' command")
-		}
-		key := args[0].Str
-		if key == "" {
-			return resp.NewData(resp.Error, "key must be a string length > 0")
-		}
-		return HandleLpush(key, args[1:])
+		return HandleLpush(args)
 
 	case "llen":
-		if len(args) != 1 {
-			return resp.NewData(resp.Error, "wrong number of arguments for 'llen' command")
-		}
-		key := args[0].Str
-		if key == "" {
-			return resp.NewData(resp.Error, "key must be a string length > 0")
-		}
-		return HandleLlen(key)
+		return HandleLlen(args)
 
 	case "lpop":
-		if len(args) < 1 || len(args) > 2 {
-			return resp.NewData(resp.Error, "wrong number of arguments for 'lpop' command")
-		}
-		key := args[0].Str
-		if key == "" {
-			return resp.NewData(resp.Error, "key must be a string length > 0")
-		}
-
-		pops := 1
-		if len(args) == 2 {
-			p, err := args[1].Integer()
-			if err != nil {
-				return resp.NewData(resp.Error, "2nd argument must be a integer")
-			}
-			pops = int(p)
-		}
-		return HandleLpop(key, pops)
+		return HandleLpop(args)
 
 	case "lrange":
-		if len(args) != 3 {
-			return resp.NewData(resp.Error, "wrong number of arguments for 'rpush' command")
-		}
-		key := args[0].Str
-		if key == "" {
-			return resp.NewData(resp.Error, "key, val must be a string length > 0")
-		}
-		return HandleLrange(key, args[1:])
+		return HandleLrange(args)
 
 	case "blpop":
 		return HandleBlpop(args)
@@ -142,9 +98,16 @@ func HandleCmdSet(args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.String, "OK")
 }
 
-func HandleRpush(key string, args []resp.DataType) resp.DataType {
-	strArgs := make([]string, 0, len(args))
-	for _, arg := range args {
+func HandleRpush(args []resp.DataType) resp.DataType {
+	if len(args) < 2 {
+		return resp.NewData(resp.Error, "wrong number of arguments for 'rpush' command")
+	}
+	key := args[0].Str
+	if key == "" {
+		return resp.NewData(resp.Error, "key must be a string length > 0")
+	}
+	strArgs := make([]string, 0, len(args)-1)
+	for _, arg := range args[1:] {
 		if arg.Is(resp.String) {
 			strArgs = append(strArgs, arg.Str)
 		} else {
@@ -158,13 +121,20 @@ func HandleRpush(key string, args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.Integer, int64(l))
 }
 
-func HandleLpush(key string, args []resp.DataType) resp.DataType {
-	strArgs := make([]string, 0, len(args))
-	for _, arg := range args {
+func HandleLpush(args []resp.DataType) resp.DataType {
+	if len(args) < 2 {
+		return resp.NewData(resp.Error, "wrong number of arguments for 'lpush' command")
+	}
+	key := args[0].Str
+	if key == "" {
+		return resp.NewData(resp.Error, "key must be a string length > 0")
+	}
+	strArgs := make([]string, 0, len(args)-1)
+	for _, arg := range args[1:] {
 		if arg.Is(resp.String) {
 			strArgs = append(strArgs, arg.Str)
 		} else {
-			return resp.NewData(resp.Error, "invalid argument type for 'Lpush' command expects only string")
+			return resp.NewData(resp.Error, "invalid argument type for 'lpush' command expects only string")
 		}
 	}
 	l, err := store.DB.Lpush(key, strArgs)
@@ -174,22 +144,44 @@ func HandleLpush(key string, args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.Integer, int64(l))
 }
 
-func HandleLpop(key string, pops int) resp.DataType {
+func HandleLpop(args []resp.DataType) resp.DataType {
+	if len(args) < 1 || len(args) > 2 {
+		return resp.NewData(resp.Error, "wrong number of arguments for 'lpop' command")
+	}
+	key := args[0].Str
+	if key == "" {
+		return resp.NewData(resp.Error, "key must be a string length > 0")
+	}
+	pops := 1
+	if len(args) == 2 {
+		p, err := args[1].Integer()
+		if err != nil {
+			return resp.NewData(resp.Error, "2nd argument must be a integer")
+		}
+		pops = int(p)
+	}
 	l, err := store.DB.Lpop(key, pops)
 	if err != nil {
 		return resp.NewData(resp.Error, err.Error())
 	}
-
-	if len(l) == 0 {
+	switch len(l) {
+	case 0:
 		return resp.NewData(resp.BulkString, "")
-	} else if len(l) == 1 {
+	case 1:
 		return resp.NewData(resp.BulkString, l[0])
-	} else {
+	default:
 		return resp.NewData(resp.Array, l)
 	}
 }
 
-func HandleLlen(key string) resp.DataType {
+func HandleLlen(args []resp.DataType) resp.DataType {
+	if len(args) != 1 {
+		return resp.NewData(resp.Error, "wrong number of arguments for 'llen' command")
+	}
+	key := args[0].Str
+	if key == "" {
+		return resp.NewData(resp.Error, "key must be a string length > 0")
+	}
 	l, err := store.DB.Llen(key)
 	if err != nil {
 		return resp.NewData(resp.Error, err.Error())
@@ -197,14 +189,21 @@ func HandleLlen(key string) resp.DataType {
 	return resp.NewData(resp.Integer, int64(l))
 }
 
-func HandleLrange(key string, args []resp.DataType) resp.DataType {
-	startIdx, err := args[0].Integer()
-	if err != nil {
-		return resp.NewData(resp.Error, "expected start index to be an integer for 'rpush' command")
+func HandleLrange(args []resp.DataType) resp.DataType {
+	if len(args) != 3 {
+		return resp.NewData(resp.Error, "wrong number of arguments for 'lrange' command")
 	}
-	endIdx, err := args[1].Integer()
+	key := args[0].Str
+	if key == "" {
+		return resp.NewData(resp.Error, "key, val must be a string length > 0")
+	}
+	startIdx, err := args[1].Integer()
 	if err != nil {
-		return resp.NewData(resp.Error, "expected end index to be an integer for 'rpush' command")
+		return resp.NewData(resp.Error, "expected start index to be an integer for 'lrange' command")
+	}
+	endIdx, err := args[2].Integer()
+	if err != nil {
+		return resp.NewData(resp.Error, "expected end index to be an integer for 'lrange' command")
 	}
 	elems, err := store.DB.Lrange(key, int(startIdx), int(endIdx))
 	if err != nil {

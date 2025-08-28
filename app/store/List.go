@@ -20,7 +20,7 @@ func (rs *RedisStore) Rpush(key string, val []string) (int, error) {
 		mem.AssignValue(val)
 		rs.Store[key] = mem
 	}
-	rs.NotifyBlockers(key)
+	rs.NotifyListener(key)
 	return len(mem.data.List), nil
 }
 
@@ -38,7 +38,7 @@ func (rs *RedisStore) Lpush(key string, val []string) (int, error) {
 		mem.AssignValue(val)
 		rs.Store[key] = mem
 	}
-	rs.NotifyBlockers(key)
+	rs.NotifyListener(key)
 	return len(mem.data.List), nil
 }
 
@@ -118,8 +118,7 @@ func (rs *RedisStore) Blpop(key string, timeout_s float64) (chan string, error) 
 	}
 
 	timer := time.NewTimer(time.Duration(timeout_s * float64(time.Second)))
-	ch := make(chan struct{})
-	rs.AddBlocker(key, ch)
+	ch := rs.subscribe(key)
 
 	go func() {
 		defer timer.Stop()
@@ -127,6 +126,7 @@ func (rs *RedisStore) Blpop(key string, timeout_s float64) (chan string, error) 
 		case <-ch:
 			item, _ := rs.Lpop(key, 1)
 			msgChan <- item[0]
+			rs.unsubscribe(key, ch)
 			return
 		case <-timer.C:
 			msgChan <- ""
