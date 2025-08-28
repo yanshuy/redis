@@ -1,7 +1,9 @@
 package request
 
 import (
+	"fmt"
 	"io"
+	"strings"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
 )
@@ -64,4 +66,48 @@ func HandleRequest(w io.Writer, rs []resp.DataType) (err error) {
 	}
 
 	return err
+}
+
+func HandleCmd(cmd string, args []resp.DataType) resp.DataType {
+	switch strings.ToLower(cmd) {
+	case "ping":
+		return resp.NewData(resp.String, "PONG")
+
+	case "echo":
+		if len(args) != 1 {
+			return resp.NewData(resp.Error, "wrong number of arguments for 'echo' command")
+		}
+		return args[0]
+
+	case "get":
+		return HandleCmdGet(args)
+
+	case "set":
+		return HandleCmdSet(args)
+
+	case "rpush":
+		return HandleRpush(args)
+
+	case "lpush":
+		return HandleLpush(args)
+
+	case "llen":
+		return HandleLlen(args)
+
+	case "lpop":
+		return HandleLpop(args)
+
+	case "lrange":
+		return HandleLrange(args)
+
+	case "blpop":
+		return HandleBlpop(args)
+
+	case "type":
+		return HandleType(args)
+
+	default:
+		msg := fmt.Sprintf("unknown command `%s`", cmd)
+		return resp.NewData(resp.Error, msg)
+	}
 }

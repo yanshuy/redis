@@ -1,54 +1,12 @@
 package request
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
-
-func HandleCmd(cmd string, args []resp.DataType) resp.DataType {
-	switch strings.ToLower(cmd) {
-	case "ping":
-		return resp.NewData(resp.String, "PONG")
-
-	case "echo":
-		if len(args) != 1 {
-			return resp.NewData(resp.Error, "wrong number of arguments for 'echo' command")
-		}
-		return args[0]
-
-	case "get":
-		return HandleCmdGet(args)
-
-	case "set":
-		return HandleCmdSet(args)
-
-	case "rpush":
-		return HandleRpush(args)
-
-	case "lpush":
-		return HandleLpush(args)
-
-	case "llen":
-		return HandleLlen(args)
-
-	case "lpop":
-		return HandleLpop(args)
-
-	case "lrange":
-		return HandleLrange(args)
-
-	case "blpop":
-		return HandleBlpop(args)
-
-	default:
-		msg := fmt.Sprintf("unknown command `%s`", cmd)
-		return resp.NewData(resp.Error, msg)
-	}
-}
 
 func HandleCmdGet(args []resp.DataType) resp.DataType {
 	if len(args) != 1 {
@@ -235,4 +193,16 @@ func HandleBlpop(args []resp.DataType) resp.DataType {
 		return resp.NewData(resp.BulkString, "")
 	}
 	return resp.NewData(resp.Array, []string{key, s})
+}
+
+func HandleType(args []resp.DataType) resp.DataType {
+	if len(args) != 1 {
+		return resp.NewData(resp.Error, "wrong number of arguments for 'blpop' command")
+	}
+	key := args[0].Str
+	if key == "" {
+		return resp.NewData(resp.Error, "key, val must be a string length > 0")
+	}
+	t := store.DB.Type(key)
+	return resp.NewData(resp.String, t)
 }

@@ -43,6 +43,18 @@ func (rs *RedisStore) Get(key string) (string, bool) {
 	return mem.data.String, ok
 }
 
+func (rs *RedisStore) Type(key string) string {
+	if m, ok := rs.Look(key); ok {
+		switch m.data.Type {
+		case List:
+			return "list"
+		case String:
+			return "string"
+		}
+	}
+	return "none"
+}
+
 func (rs *RedisStore) subscribe(key string) chan struct{} {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
