@@ -67,7 +67,9 @@ func TestRequest_MultipleInOneBuffer(t *testing.T) {
 	require.Equal(t, "+PONG\r\n+PONG\r\n", conn.Output())
 }
 
-func resetStore() { store.DB = store.RedisStore{Store: make(map[string]*store.StoreMember)} }
+func resetStore() {
+	store.DB = store.RedisStore{Store: make(map[string]*store.StoreMember), Config: make(map[string]string), Listeners: make(map[string][]chan struct{})}
+}
 
 func TestRequest_GET_MissingKey(t *testing.T) {
 	resetStore()
@@ -236,6 +238,16 @@ func TestRequest_LRANGE_NegativeEnd2(t *testing.T) {
 func TestRequest_Remove_multiple_elements(t *testing.T) {
 	resetStore()
 	payload := "*7\r\n$5\r\nRPUSH\r\n$10\r\nstrawberry\r\n$9\r\npineapple\r\n$5\r\ngrape\r\n$6\r\nbanana\r\n$5\r\napple\r\n$6\r\norange\r\n*3\r\n$4\r\nLPOP\r\n$10\r\nstrawberry\r\n$1\r\n4\r\n*4\r\n$6\r\nLRANGE\r\n$10\r\nstrawberry\r\n$1\r\n0\r\n$2\r\n-1\r\n"
+	conn := newRW(payload)
+	_, err := ReadAndHandleRequest(conn)
+	require.NoError(t, err)
+	out := conn.Output()
+	fmt.Println(out)
+}
+
+func TestRequest_BLpop(t *testing.T) {
+	resetStore()
+	payload := "*3\r\n$5\r\nBLPOP\r\n$6\r\norange\r\n$3\r\n0.4\r\n*3\r\n$5\r\nRPUSH\r\n$6\r\norange\r\n$6\r\nbanana\r\n"
 	conn := newRW(payload)
 	_, err := ReadAndHandleRequest(conn)
 	require.NoError(t, err)

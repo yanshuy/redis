@@ -5,12 +5,28 @@ import (
 	"time"
 )
 
-var DB = RedisStore{
-	Store:     make(map[string]*StoreMember),
-	Config:    make(map[string]string),
-	Listeners: make(map[string][]chan struct{}),
-	mu:        sync.Mutex{},
+type RedisStore struct {
+	Store     map[string]*StoreMember
+	Config    map[string]string
+	Listeners map[string][]chan struct{}
+	mu        sync.Mutex
 }
+
+func NewRedisStore() RedisStore {
+	return RedisStore{
+		Store:     make(map[string]*StoreMember),
+		Config:    make(map[string]string),
+		Listeners: make(map[string][]chan struct{}),
+		mu:        sync.Mutex{},
+	}
+}
+
+func (rs *RedisStore) Look(key string) (*StoreMember, bool) {
+	m, ok := rs.Store[key]
+	return m, ok
+}
+
+var DB RedisStore = NewRedisStore()
 
 func (rs *RedisStore) RemoveMemberAfter(ttl_ms int64, key string) {
 	timer := time.NewTimer(time.Duration(ttl_ms) * time.Millisecond)

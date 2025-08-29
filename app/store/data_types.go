@@ -1,7 +1,6 @@
 package store
 
 import (
-	"sync"
 	"time"
 )
 
@@ -18,18 +17,6 @@ type Data struct {
 	String string
 	Stream *StreamObj
 	List   []string
-}
-
-type RedisStore struct {
-	Store     map[string]*StoreMember
-	Config    map[string]string
-	Listeners map[string][]chan struct{}
-	mu        sync.Mutex
-}
-
-func (rs *RedisStore) Look(key string) (*StoreMember, bool) {
-	m, ok := rs.Store[key]
-	return m, ok
 }
 
 type StoreMember struct {

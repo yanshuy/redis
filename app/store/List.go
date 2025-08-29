@@ -19,7 +19,7 @@ func (rs *RedisStore) Rpush(key string, val []string) (int, error) {
 		mem = rs.NewStoreMember(key, List)
 		mem.data.List = append(mem.data.List, val...)
 	}
-	rs.NotifyListener(key)
+	go rs.NotifyListener(key)
 	return len(mem.data.List), nil
 }
 
@@ -36,7 +36,7 @@ func (rs *RedisStore) Lpush(key string, val []string) (int, error) {
 		mem = rs.NewStoreMember(key, List)
 		mem.data.List = append(mem.data.List, val...)
 	}
-	rs.NotifyListener(key)
+	go rs.NotifyListener(key)
 	return len(mem.data.List), nil
 }
 
