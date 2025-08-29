@@ -268,3 +268,29 @@ func HandleXrange(args []resp.DataType) resp.DataType {
 	}
 	return res
 }
+
+func HandleXread(args []resp.DataType) resp.DataType {
+	return resp.NewData(resp.Array)
+}
+
+func HandleConfig(args []resp.DataType) resp.DataType {
+	if len(args) < 2 {
+		return resp.NewData(resp.Error, "wrong number of arguments for 'config' command")
+	}
+	sub := strings.ToLower(args[0].Str)
+	if sub == "get" {
+		strArgs := make([]string, 0, len(args))
+		for _, arg := range args[1:] {
+			if arg.Str == "" {
+				return resp.NewData(resp.Error, "argument must be a string length > 0")
+			}
+			strArgs = append(strArgs, arg.Str)
+		}
+		configs, err := store.DB.ConfigGet(strArgs)
+		if err != nil {
+			return resp.NewData(resp.Error, err.Error())
+		}
+		return resp.NewData(resp.Array, configs)
+	}
+	return resp.NewData(resp.Array, nil)
+}

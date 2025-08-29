@@ -16,7 +16,7 @@ func ReadAndHandleRequest(conn io.ReadWriter) (n int, err error) {
 		n, err := conn.Read(b[bLen:])
 		if n > 0 {
 			bLen += n
-			r, o, err := Parse(b[:bLen])
+			r, o, err := resp.Parse(b[:bLen])
 			if err != nil {
 				return bLen, err
 			}
@@ -111,6 +111,12 @@ func HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 
 	case "xrange":
 		return HandleXrange(args)
+
+	case "xread":
+		return HandleXread(args)
+
+	case "config":
+		return HandleConfig(args)
 
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd)

@@ -5,19 +5,9 @@ import (
 	"time"
 )
 
-type RedisStore struct {
-	Store     map[string]*StoreMember
-	Listeners map[string][]chan struct{}
-	mu        sync.Mutex
-}
-
-func (rs *RedisStore) Look(key string) (*StoreMember, bool) {
-	m, ok := rs.Store[key]
-	return m, ok
-}
-
 var DB = RedisStore{
 	Store:     make(map[string]*StoreMember),
+	Config:    make(map[string]string),
 	Listeners: make(map[string][]chan struct{}),
 	mu:        sync.Mutex{},
 }

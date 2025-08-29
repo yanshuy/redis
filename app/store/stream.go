@@ -23,15 +23,6 @@ type StreamObj struct {
 	Entries []StreamEntry
 }
 
-func (s StreamObj) FindEntry(id StreamID) *StreamEntry {
-	for i, entry := range s.Entries {
-		if entry.Id == id {
-			return &s.Entries[i]
-		}
-	}
-	return nil
-}
-
 func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (s string, err error) {
 	m, exists := rs.Look(key)
 
