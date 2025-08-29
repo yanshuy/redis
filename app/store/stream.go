@@ -89,26 +89,44 @@ func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (s string,
 
 func (rs *RedisStore) XRange(key string, startStr string, endStr string) ([]StreamEntry, error) {
 	m, exists := rs.Look(key)
-	stream := m.data.Stream
 	if !exists {
 		return nil, nil
 	}
+	stream := m.data.Stream
+
+	startStr = strings.TrimSpace(startStr)
+	endStr = strings.TrimSpace(endStr)
 	var start, end int64
 	var startSeq, endSeq int
+	var err error
+
 	startParts := strings.Split(startStr, "-")
 	endParts := strings.Split(endStr, "-")
-	if len(startParts) != len(endParts) || len(startParts) > 2 {
+	fmt.Println(startParts)
+	if len(endParts) > 2 || len(startParts) > 2 {
 		return nil, errors.New("invalid arguments")
 	}
 
-	start, err := strconv.ParseInt(startParts[0], 10, 64)
-	if err != nil {
-		return nil, errors.New("invalid arguments")
+	if startStr == "-" {
+		start = stream.Entries[0].Id.MS
+		startParts = nil
+	} else {
+		start, err = strconv.ParseInt(startParts[0], 10, 64)
+		if err != nil {
+			return nil, errors.New("invalid arguments")
+		}
 	}
-	end, err = strconv.ParseInt(endParts[0], 10, 64)
-	if err != nil {
-		return nil, errors.New("invalid arguments")
+
+	if endStr == "+" {
+		end = stream.Entries[len(stream.Entries)-1].Id.MS
+		endParts = nil
+	} else {
+		end, err = strconv.ParseInt(endParts[0], 10, 64)
+		if err != nil {
+			return nil, errors.New("invalid arguments")
+		}
 	}
+
 	if start > end {
 		return nil, nil
 	}
@@ -120,17 +138,12 @@ func (rs *RedisStore) XRange(key string, startStr string, endStr string) ([]Stre
 		}
 	}
 
+	lo := 0
 	if len(startParts) == 2 {
 		startSeq, err = strconv.Atoi(startParts[1])
 		if err != nil {
 			return nil, errors.New("invalid arguments")
 		}
-		endSeq, err = strconv.Atoi(endParts[1])
-		if err != nil {
-			return nil, errors.New("invalid arguments")
-		}
-
-		lo := 0
 		for lo < len(entries) {
 			e := entries[lo]
 			if e.Id.MS == start && e.Id.Seq < startSeq {
@@ -140,6 +153,14 @@ func (rs *RedisStore) XRange(key string, startStr string, endStr string) ([]Stre
 			} else {
 				break
 			}
+		}
+		entries = entries[lo:]
+	}
+
+	if len(endParts) == 2 {
+		endSeq, err = strconv.Atoi(endParts[1])
+		if err != nil {
+			return nil, errors.New("invalid arguments")
 		}
 		hi := len(entries) - 1
 		for hi >= lo {
@@ -152,7 +173,8 @@ func (rs *RedisStore) XRange(key string, startStr string, endStr string) ([]Stre
 				break
 			}
 		}
-		entries = entries[lo : hi+1]
+		entries = entries[:hi+1]
 	}
+
 	return entries, nil
 }
