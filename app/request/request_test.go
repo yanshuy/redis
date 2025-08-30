@@ -3,7 +3,11 @@ package request
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"path"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 	"github.com/stretchr/testify/require"
@@ -68,7 +72,8 @@ func TestRequest_MultipleInOneBuffer(t *testing.T) {
 }
 
 func resetStore() {
-	store.DB = store.RedisStore{Store: make(map[string]*store.StoreMember), Config: make(map[string]string), Listeners: make(map[string][]chan struct{})}
+	store.RDB = store.RedisStore{Store: make(map[string]*store.StoreMember), Config: make(map[string]string), Listeners: make(map[string][]chan struct{})}
+	store.RDB.InitConfig("dir", "tmp", "dbfilename", "rdb.test")
 }
 
 func TestRequest_GET_MissingKey(t *testing.T) {
@@ -247,10 +252,48 @@ func TestRequest_Remove_multiple_elements(t *testing.T) {
 
 func TestRequest_BLpop(t *testing.T) {
 	resetStore()
-	payload := "*3\r\n$5\r\nBLPOP\r\n$6\r\norange\r\n$3\r\n0.4\r\n*3\r\n$5\r\nRPUSH\r\n$6\r\norange\r\n$6\r\nbanana\r\n"
+
+	blpopPayload := "*3\r\n$5\r\nBLPOP\r\n$6\r\norange\r\n$3\r\n1.0\r\n"
+	connBL := newRW(blpopPayload)
+
+	go func() {
+		_, err := ReadAndHandleRequest(connBL)
+		require.NoError(t, err)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+	rpushPayload := "*3\r\n$5\r\nRPUSH\r\n$6\r\norange\r\n$6\r\nbanana\r\n"
+	connRP := newRW(rpushPayload)
+	_, err := ReadAndHandleRequest(connRP)
+	require.NoError(t, err)
+	fmt.Println("RPUSH output:", connRP.Output())
+
+	time.Sleep(50 * time.Millisecond)
+	out := connBL.Output()
+	fmt.Println("BLPOP output:", out)
+	require.Contains(t, out, "-1")
+}
+
+func TestRequest_Save(t *testing.T) {
+	resetStore()
+	payload := "*3\r\n$3\r\nSET\r\n$3\r\nFOO\r\n$3\r\nBAR\r\n"
 	conn := newRW(payload)
 	_, err := ReadAndHandleRequest(conn)
 	require.NoError(t, err)
 	out := conn.Output()
 	fmt.Println(out)
+	err = store.RDB.SaveRDBSnapshot()
+	require.NoError(t, err)
+	err = store.RDB.RestoreRDBSnapshot()
+	require.NoError(t, err)
+}
+
+func Test_func(t *testing.T) {
+	cwd, _ := os.Getwd()
+	dir := store.RDB.Config["dir"]
+	if !filepath.IsAbs(dir) {
+		dir = filepath.Join(cwd, dir)
+	}
+	j := path.Join("/root", store.RDB.Config["dir"], store.RDB.Config["dbfilename"])
+	fmt.Println(j)
 }

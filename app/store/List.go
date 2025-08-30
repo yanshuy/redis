@@ -10,13 +10,13 @@ import (
 func (rs *RedisStore) Rpush(key string, val []string) (int, error) {
 	var mem *StoreMember
 	if m, ok := rs.Look(key); ok {
-		if m.data.Type != List {
+		if m.data.Type != LIST {
 			return 0, fmt.Errorf("provided key '%s' holds some other data", key)
 		}
 		mem = m
 		mem.data.List = append(mem.data.List, val...)
 	} else {
-		mem = rs.NewStoreMember(key, List)
+		mem = rs.NewStoreMember(key, LIST)
 		mem.data.List = append(mem.data.List, val...)
 	}
 	go rs.NotifyListener(key)
@@ -26,14 +26,14 @@ func (rs *RedisStore) Rpush(key string, val []string) (int, error) {
 func (rs *RedisStore) Lpush(key string, val []string) (int, error) {
 	var mem *StoreMember
 	if m, ok := rs.Look(key); ok {
-		if m.data.Type != List {
+		if m.data.Type != LIST {
 			return 0, fmt.Errorf("provided key '%s' does not hold a list", key)
 		}
 		mem = m
 		slices.Reverse(val)
 		m.data.List = append(val, m.data.List...)
 	} else {
-		mem = rs.NewStoreMember(key, List)
+		mem = rs.NewStoreMember(key, LIST)
 		mem.data.List = append(mem.data.List, val...)
 	}
 	go rs.NotifyListener(key)
@@ -42,7 +42,7 @@ func (rs *RedisStore) Lpush(key string, val []string) (int, error) {
 
 func (rs *RedisStore) Lpop(key string, popCount int) ([]string, error) {
 	if m, ok := rs.Look(key); ok {
-		if m.data.Type != List {
+		if m.data.Type != LIST {
 			return nil, fmt.Errorf("provided key '%s' does not hold a list", key)
 		}
 		if popCount > len(m.data.List) {
@@ -61,8 +61,8 @@ func (rs *RedisStore) Lpop(key string, popCount int) ([]string, error) {
 
 func (rs *RedisStore) Llen(key string) (int, error) {
 	if m, ok := rs.Look(key); ok {
-		if m.data.Type != List {
-			return 0, fmt.Errorf("provided key '%s' does not hold a list", key)
+		if m.data.Type != LIST {
+			return 0, fmt.Errorf("provided key '%s' does not hold a LIST", key)
 		}
 		return len(m.data.List), nil
 	} else {
@@ -72,7 +72,7 @@ func (rs *RedisStore) Llen(key string) (int, error) {
 
 func (rs *RedisStore) Lrange(key string, startIdx int, endIdx int) ([]string, error) {
 	if m, ok := rs.Look(key); ok {
-		if m.data.Type != List {
+		if m.data.Type != LIST {
 			return nil, fmt.Errorf("provided key '%s' holds some other data", key)
 		}
 		if startIdx < 0 {
@@ -98,16 +98,17 @@ func (rs *RedisStore) Lrange(key string, startIdx int, endIdx int) ([]string, er
 	}
 }
 
-func (rs *RedisStore) Blpop(key string, timeout_s float64) (chan string, error) {
+func (rs *RedisStore) Blpop(key string, timeout_s float64) (<-chan string, error) {
 	item, err := rs.Lpop(key, 1)
 	if err != nil {
 		return nil, err
 	}
 
-	msgChan := make(chan string)
+	msgChan := make(chan string, 1)
 
 	if len(item) == 1 {
 		msgChan <- item[0]
+		close(msgChan)
 		return msgChan, nil
 	}
 
@@ -124,12 +125,11 @@ func (rs *RedisStore) Blpop(key string, timeout_s float64) (chan string, error) 
 		case <-ch:
 			item, _ := rs.Lpop(key, 1)
 			msgChan <- item[0]
-			rs.unsubscribe(key, ch)
-			return
 		case <-timer.C:
 			msgChan <- ""
-			return
 		}
+		close(msgChan)
+		rs.unsubscribe(key, ch)
 	}()
 	return msgChan, nil
 }

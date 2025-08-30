@@ -60,7 +60,7 @@ func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (s string,
 
 	streamId := StreamID{time_ms, seqNo}
 	if !exists {
-		m := rs.NewStoreMember(key, Stream)
+		m := rs.NewStoreMember(key, STREAM)
 		s := &StreamObj{
 			LastID:  streamId,
 			Entries: []StreamEntry{{streamId, key_vals}},
@@ -93,7 +93,6 @@ func (rs *RedisStore) XRange(key string, startStr string, endStr string) ([]Stre
 
 	startParts := strings.Split(startStr, "-")
 	endParts := strings.Split(endStr, "-")
-	fmt.Println(startParts)
 	if len(endParts) > 2 || len(startParts) > 2 {
 		return nil, errors.New("invalid arguments")
 	}

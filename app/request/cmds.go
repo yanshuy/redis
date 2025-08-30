@@ -17,7 +17,7 @@ func HandleCmdGet(args []resp.DataType) resp.DataType {
 	if key == "" {
 		return resp.NewData(resp.Error, "key must be a string length > 0")
 	}
-	if val, ok := store.DB.Get(key); ok {
+	if val, ok := store.RDB.Get(key); ok {
 		return resp.NewData(resp.BulkString, val)
 	} else {
 		return resp.NewData(resp.BulkString, "")
@@ -53,7 +53,7 @@ func HandleCmdSet(args []resp.DataType) resp.DataType {
 		}
 	}
 
-	store.DB.Set(key, val, expiry)
+	store.RDB.Set(key, val, expiry)
 	return resp.NewData(resp.String, "OK")
 }
 
@@ -73,7 +73,7 @@ func HandleRpush(args []resp.DataType) resp.DataType {
 			return resp.NewData(resp.Error, "invalid argument type for 'rpush' command expects only string")
 		}
 	}
-	l, err := store.DB.Rpush(key, strArgs)
+	l, err := store.RDB.Rpush(key, strArgs)
 	if err != nil {
 		return resp.NewData(resp.Error, err.Error())
 	}
@@ -96,7 +96,7 @@ func HandleLpush(args []resp.DataType) resp.DataType {
 			return resp.NewData(resp.Error, "invalid argument type for 'lpush' command expects only string")
 		}
 	}
-	l, err := store.DB.Lpush(key, strArgs)
+	l, err := store.RDB.Lpush(key, strArgs)
 	if err != nil {
 		return resp.NewData(resp.Error, err.Error())
 	}
@@ -119,7 +119,7 @@ func HandleLpop(args []resp.DataType) resp.DataType {
 		}
 		pops = int(p)
 	}
-	l, err := store.DB.Lpop(key, pops)
+	l, err := store.RDB.Lpop(key, pops)
 	if err != nil {
 		return resp.NewData(resp.Error, err.Error())
 	}
@@ -141,7 +141,7 @@ func HandleLlen(args []resp.DataType) resp.DataType {
 	if key == "" {
 		return resp.NewData(resp.Error, "key must be a string length > 0")
 	}
-	l, err := store.DB.Llen(key)
+	l, err := store.RDB.Llen(key)
 	if err != nil {
 		return resp.NewData(resp.Error, err.Error())
 	}
@@ -164,7 +164,7 @@ func HandleLrange(args []resp.DataType) resp.DataType {
 	if err != nil {
 		return resp.NewData(resp.Error, "expected end index to be an integer for 'lrange' command")
 	}
-	elems, err := store.DB.Lrange(key, int(startIdx), int(endIdx))
+	elems, err := store.RDB.Lrange(key, int(startIdx), int(endIdx))
 	if err != nil {
 		return resp.NewData(resp.Error, err.Error())
 	}
@@ -184,14 +184,13 @@ func HandleBlpop(args []resp.DataType) resp.DataType {
 		return resp.NewData(resp.Error, "expected 2 argument to be an number for 'blpop' command")
 	}
 
-	msgChan, err := store.DB.Blpop(key, timeout_s)
-	defer close(msgChan)
+	msgChan, err := store.RDB.Blpop(key, timeout_s)
 	if err != nil {
 		return resp.NewData(resp.Error, err.Error())
 	}
 	s := <-msgChan
 	if s == "" {
-		return resp.NewData(resp.BulkString, "")
+		return resp.NewData(resp.Array, nil)
 	}
 	return resp.NewData(resp.Array, []string{key, s})
 }
@@ -204,7 +203,7 @@ func HandleType(args []resp.DataType) resp.DataType {
 	if key == "" {
 		return resp.NewData(resp.Error, "key, val must be a string length > 0")
 	}
-	t := store.DB.Type(key)
+	t := store.RDB.Type(key)
 	return resp.NewData(resp.String, t)
 }
 
@@ -233,7 +232,7 @@ func HandleXadd(args []resp.DataType) resp.DataType {
 		}
 		key_vals = append(key_vals, key.Str, val.Str)
 	}
-	s, err := store.DB.Xadd(key, stream_key, key_vals)
+	s, err := store.RDB.Xadd(key, stream_key, key_vals)
 	if err != nil {
 		return resp.NewData(resp.Error, err.Error())
 	}
@@ -251,11 +250,10 @@ func HandleXrange(args []resp.DataType) resp.DataType {
 	startStr := args[1].Str
 	endStr := args[2].Str
 
-	entries, err := store.DB.XRange(key, startStr, endStr)
+	entries, err := store.RDB.XRange(key, startStr, endStr)
 	if err != nil {
 		return resp.NewData(resp.Error, err.Error())
 	}
-	fmt.Printf("result %+v \n", entries)
 
 	res := resp.NewData(resp.Array)
 	for _, entry := range entries {
@@ -286,11 +284,23 @@ func HandleConfig(args []resp.DataType) resp.DataType {
 			}
 			strArgs = append(strArgs, arg.Str)
 		}
-		configs, err := store.DB.ConfigGet(strArgs)
+		configs, err := store.RDB.ConfigGet(strArgs)
 		if err != nil {
 			return resp.NewData(resp.Error, err.Error())
 		}
 		return resp.NewData(resp.Array, configs)
 	}
 	return resp.NewData(resp.Array, nil)
+}
+
+func HandleKeys(args []resp.DataType) resp.DataType {
+	if len(args) != 1 {
+		return resp.NewData(resp.Error, "wrong number of arguments for 'config' command")
+	}
+	pattern := args[0].Str
+	if pattern == "" {
+		return resp.NewData(resp.Error, "key, val must be a string length > 0")
+	}
+	keys := store.RDB.Keys(pattern)
+	return resp.NewData(resp.Array, keys)
 }

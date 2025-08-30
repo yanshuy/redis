@@ -141,6 +141,9 @@ func (d *DataType) ToResponse() []byte {
 		return res
 
 	case Array:
+		if len(d.Arr) == 0 {
+			return []byte("*-1\r\n")
+		}
 		n := strconv.Itoa(len(d.Arr))
 		res := make([]byte, 0, 1+len(n)+2)
 		res = append(res, Array)

@@ -11,13 +11,18 @@ import (
 )
 
 var (
-	dirFlag    = flag.String("dir", "", "Directory for RDB persistence")
-	dbFileFlag = flag.String("dbfilename", "", "RDB file name")
+	dirFlag    = flag.String("dir", "tmp", "Directory for RDB persistence")
+	dbFileFlag = flag.String("dbfilename", "rdb.snapshot", "RDB file name")
 )
 
 func main() {
 	flag.Parse()
-	store.DB.InitConfig("dir", *dirFlag, "dbfilename", *dbFileFlag)
+	store.RDB.InitConfig("dir", *dirFlag, "dbfilename", *dbFileFlag)
+
+	err := store.RDB.RestoreRDBSnapshot()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	l, err := net.Listen("tcp", "0.0.0.0:6379")
 	if err != nil {

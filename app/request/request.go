@@ -3,9 +3,11 @@ package request
 import (
 	"fmt"
 	"io"
+	"log"
 	"strings"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
+	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
 func ReadAndHandleRequest(conn io.ReadWriter) (n int, err error) {
@@ -106,6 +108,9 @@ func HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 	case "type":
 		return HandleType(args)
 
+	case "keys":
+		return HandleKeys(args)
+
 	case "xadd":
 		return HandleXadd(args)
 
@@ -117,6 +122,14 @@ func HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 
 	case "config":
 		return HandleConfig(args)
+
+	case "save":
+		err := store.RDB.SaveRDBSnapshot()
+		if err != nil {
+			log.Println(err)
+			return resp.NewData(resp.Error, "save failed")
+		}
+		return resp.NewData(resp.String, "OK")
 
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd)
