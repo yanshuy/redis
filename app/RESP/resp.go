@@ -48,9 +48,13 @@ func NewData(t byte, data ...any) DataType {
 			}
 			switch v := item.(type) {
 			case []string:
-				for _, elem := range v {
-					s := NewData(BulkString, elem)
-					d.Arr = append(d.Arr, s)
+				if len(v) != 0 {
+					for _, elem := range v {
+						s := NewData(BulkString, elem)
+						d.Arr = append(d.Arr, s)
+					}
+				} else {
+					d.Arr = []DataType{}
 				}
 			case string:
 				s := NewData(BulkString, v)
@@ -141,7 +145,8 @@ func (d *DataType) ToResponse() []byte {
 		return res
 
 	case Array:
-		if len(d.Arr) == 0 {
+		fmt.Println("to res of arr", d.Arr == nil, len(d.Arr))
+		if d.Arr == nil {
 			return []byte("*-1\r\n")
 		}
 		n := strconv.Itoa(len(d.Arr))
@@ -152,6 +157,7 @@ func (d *DataType) ToResponse() []byte {
 		for _, sd := range d.Arr {
 			res = append(res, sd.ToResponse()...)
 		}
+		fmt.Println("to res of safe", d.Arr == nil, len(d.Arr))
 		return res
 
 	default:

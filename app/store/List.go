@@ -82,12 +82,11 @@ func (rs *RedisStore) Lrange(key string, startIdx int, endIdx int) ([]string, er
 			endIdx = max(len(m.data.List)+endIdx, 0)
 		}
 		if startIdx > endIdx || startIdx > len(m.data.List) {
-			return nil, nil
+			return []string{}, nil
 		}
 		if endIdx >= len(m.data.List) {
 			endIdx = len(m.data.List) - 1
 		}
-		fmt.Println(endIdx, startIdx)
 		items := make([]string, 0, endIdx-startIdx)
 		for i := startIdx; i < endIdx+1; i++ {
 			items = append(items, m.data.List[i])
