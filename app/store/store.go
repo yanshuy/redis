@@ -70,11 +70,21 @@ func (rs *RedisStore) Set(key string, val string, ttl_ms int64) {
 
 func (rs *RedisStore) Get(key string) (string, bool) {
 	mem, ok := rs.Store[key]
+	if !ok {
+		return "", false
+	}
+	if mem.ExpiryAt > 0 && mem.ExpiryAt <= time.Now().UnixMilli() {
+		delete(rs.Store, key)
+		return "", false
+	}
+	if mem.data.Type != STRING {
+		return "", false
+	}
 	return mem.data.String, ok
 }
 
 func (rs *RedisStore) Keys(pattern string) []string {
-	subStr := strings.Replace(pattern, "*", "", -1)
+	subStr := strings.ReplaceAll(pattern, "*", "")
 
 	ans := make([]string, 0)
 	for key := range rs.Store {
