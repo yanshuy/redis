@@ -164,6 +164,7 @@ func HandleLrange(args []resp.DataType) resp.DataType {
 	if err != nil {
 		return resp.NewData(resp.Error, "expected end index to be an integer for 'lrange' command")
 	}
+	fmt.Println(endIdx, startIdx)
 	elems, err := store.RDB.Lrange(key, int(startIdx), int(endIdx))
 	if err != nil {
 		return resp.NewData(resp.Error, err.Error())
