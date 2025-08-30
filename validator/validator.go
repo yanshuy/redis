@@ -4,6 +4,8 @@ import (
 	"errors"
 )
 
+// experimenting
+
 type SliceV[T any] struct {
 	slice []T
 }
