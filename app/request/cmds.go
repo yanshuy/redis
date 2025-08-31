@@ -349,12 +349,14 @@ func (c *Channels) unsubscribe(channel string, client *Client) {
 	if ok {
 		c.mu.Lock()
 		subs := c.Channels[channel]
+		fmt.Println("before", len(subs))
 		for i, c := range subs {
 			if c == client {
 				subs = append(subs[:i], subs[i+1:]...)
 				break
 			}
 		}
+		fmt.Println("after", len(subs))
 		if len(subs) == 0 {
 			delete(c.Channels, channel)
 		}
@@ -362,6 +364,7 @@ func (c *Channels) unsubscribe(channel string, client *Client) {
 
 		close(ch)
 		delete(client.subscriptions, channel)
+		fmt.Println("after", len(client.subscriptions))
 		if len(client.subscriptions) == 0 {
 			client.done <- struct{}{}
 		}
