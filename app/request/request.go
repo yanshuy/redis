@@ -61,23 +61,17 @@ func NewClient(conn io.Writer) *Client {
 func (c *Client) HandleRequest(w io.Writer, rs []resp.DataType) (err error) {
 	for _, r := range rs {
 		var res resp.DataType
+		f := r.Arr[0]
 		switch r.Type {
 		case resp.Array:
-			f := r.Arr[0]
 			if f.Str == "" {
 				res = resp.NewData(resp.Error, "invalid command")
 				break
 			}
-			if strings.ToLower(f.Str) == "ping" {
-				res = resp.NewData(resp.String, "PONG")
-				break
-			}
 			res = c.HandleCmd(f.Str, r.Arr[1:])
+		case resp.String, resp.BulkString:
+			res = c.HandleCmd(f.Str, nil)
 		default:
-			if strings.ToLower(r.Str) == "ping" {
-				res = resp.NewData(resp.String, "PONG")
-				break
-			}
 			res = resp.NewData(resp.Error, "invalid command")
 		}
 
@@ -108,6 +102,8 @@ func (c *Client) HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 	}
 
 	switch cmd {
+	case "ping":
+		return resp.NewData(resp.String, "PONG")
 	case "echo":
 		if len(args) != 1 {
 			return resp.NewData(resp.Error, "wrong number of arguments for 'echo' command")
