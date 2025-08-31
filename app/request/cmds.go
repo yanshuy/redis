@@ -328,6 +328,15 @@ func (c *Channels) subscribe(channel string, client *Client) {
 	}
 }
 
+func (c *Channels) Publish(channel string, message string) {
+	subs := c.Channels[channel]
+	for _, c := range subs {
+		go func() {
+			c.messageChan <- message
+		}()
+	}
+}
+
 var Chans = Channels{
 	Channels: make(map[string][]*Client),
 }
@@ -342,6 +351,19 @@ func HandleSubscribe(c *Client, args []resp.DataType) resp.DataType {
 	}
 
 	Chans.subscribe(channel, c)
+
+	go func() {
+		for {
+			select {
+			case s := <-c.messageChan:
+				res := resp.NewData(resp.Array, "message", channel, s)
+				c.conn.Write(res.ToResponse())
+			case <-c.done:
+				return
+			}
+		}
+	}()
+
 	return resp.NewData(resp.Array, []string{"subscribe", channel}, resp.NewData(resp.Integer, int64(len(c.subscriptions))))
 }
 
@@ -353,6 +375,11 @@ func HandlePublish(args []resp.DataType) resp.DataType {
 	if channel == "" {
 		return resp.NewData(resp.Error, "channel name must be a string length > 0")
 	}
+	message := args[1].Str
+	if channel == "" {
+		return resp.NewData(resp.Error, "message name must be a string length > 0")
+	}
 
+	Chans.Publish(channel, message)
 	return resp.NewData(resp.Integer, int64(Chans.subscribers(channel)))
 }
