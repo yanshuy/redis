@@ -43,23 +43,39 @@ func ReadAndHandleRequest(conn io.ReadWriter) (n int, err error) {
 	return bLen, nil
 }
 
+type Client struct {
+	conn          io.Writer
+	subscriptions map[string]struct{}
+	subscribeMode bool
+}
+
+func NewClient(conn io.Writer) *Client {
+	return &Client{
+		conn:          conn,
+		subscriptions: make(map[string]struct{}),
+		subscribeMode: false,
+	}
+}
+
 func HandleRequest(w io.Writer, rs []resp.DataType) (err error) {
+	c := NewClient(w)
 	for _, r := range rs {
 		var res resp.DataType
 		switch r.Type {
 		case resp.Array:
-			if r.Arr[0].Is(resp.String) {
-				res = HandleCmd(r.Arr[0].Str, r.Arr[1:])
-			} else {
+			f := r.Arr[0]
+			if !f.Is(resp.String) {
 				res = resp.NewData(resp.Error, "invalid command")
+				break
 			}
-		case resp.String, resp.BulkString:
-			res = HandleCmd(r.Str, nil)
+			res = c.HandleCmd(f.Str, r.Arr[1:])
 		default:
+			if strings.ToLower(r.Str) == "ping" {
+				res = resp.NewData(resp.String, "PONG")
+			}
 			res = resp.NewData(resp.Error, "invalid command")
 		}
 
-		// fmt.Printf("res %+v\n", res)
 		resBytes := res.ToResponse()
 		_, err := w.Write(resBytes)
 		if err != nil {
@@ -70,11 +86,8 @@ func HandleRequest(w io.Writer, rs []resp.DataType) (err error) {
 	return err
 }
 
-func HandleCmd(cmd string, args []resp.DataType) resp.DataType {
+func (c *Client) HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 	switch strings.ToLower(cmd) {
-	case "ping":
-		return resp.NewData(resp.String, "PONG")
-
 	case "echo":
 		if len(args) != 1 {
 			return resp.NewData(resp.Error, "wrong number of arguments for 'echo' command")
@@ -132,7 +145,8 @@ func HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 		return resp.NewData(resp.String, "OK")
 
 	case "subscribe":
-		return HandleSubscribe(args)
+		c.subscribeMode = true
+		return HandleSubscribe(c, args)
 
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd)
