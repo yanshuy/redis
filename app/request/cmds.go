@@ -20,7 +20,7 @@ func HandleCmdGet(args []resp.DataType) resp.DataType {
 	if val, ok := store.RDB.Get(key); ok {
 		return resp.NewData(resp.BulkString, val)
 	} else {
-		return resp.NewData(resp.BulkString, "")
+		return resp.NewData(resp.BulkString, "-1")
 	}
 }
 
@@ -67,7 +67,7 @@ func HandleRpush(args []resp.DataType) resp.DataType {
 	}
 	strArgs := make([]string, 0, len(args)-1)
 	for _, arg := range args[1:] {
-		if arg.Is(resp.String) {
+		if arg.Is(resp.BulkString) {
 			strArgs = append(strArgs, arg.Str)
 		} else {
 			return resp.NewData(resp.Error, "invalid argument type for 'rpush' command expects only string")
@@ -90,7 +90,7 @@ func HandleLpush(args []resp.DataType) resp.DataType {
 	}
 	strArgs := make([]string, 0, len(args)-1)
 	for _, arg := range args[1:] {
-		if arg.Is(resp.String) {
+		if arg.Is(resp.BulkString) {
 			strArgs = append(strArgs, arg.Str)
 		} else {
 			return resp.NewData(resp.Error, "invalid argument type for 'lpush' command expects only string")
@@ -125,7 +125,7 @@ func HandleLpop(args []resp.DataType) resp.DataType {
 	}
 	switch len(l) {
 	case 0:
-		return resp.NewData(resp.BulkString, "")
+		return resp.NewData(resp.BulkString, "-1")
 	case 1:
 		return resp.NewData(resp.BulkString, l[0])
 	default:
