@@ -305,7 +305,7 @@ func HandleKeys(args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.Array, keys)
 }
 
-func HandleSubscribe(c *Client, args []resp.DataType) resp.DataType {
+func HandleSubscribe(args []resp.DataType) resp.DataType {
 	if len(args) != 1 {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'config' command")
 	}
@@ -313,6 +313,19 @@ func HandleSubscribe(c *Client, args []resp.DataType) resp.DataType {
 	if channel == "" {
 		return resp.NewData(resp.Error, "channel name must be a string length > 0")
 	}
-	c.subscriptions[channel] = struct{}{}
-	return resp.NewData(resp.Array, []string{"subscribe", channel}, resp.NewData(resp.Integer, int64(len(c.subscriptions))))
+
+	Chans.subscribe(channel)
+	return resp.NewData(resp.Array, []string{"subscribe", channel}, resp.NewData(resp.Integer, int64(Chans.subscribers(channel))))
+}
+
+func HandlePublish(args []resp.DataType) resp.DataType {
+	if len(args) != 2 {
+		return resp.NewData(resp.Error, "wrong number of arguments for 'config' command")
+	}
+	channel := args[0].Str
+	if channel == "" {
+		return resp.NewData(resp.Error, "channel name must be a string length > 0")
+	}
+
+	return resp.NewData(resp.Integer, int64(Chans.subscribers(channel)))
 }

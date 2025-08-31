@@ -5,10 +5,25 @@ import (
 	"io"
 	"log"
 	"strings"
+	"sync"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
+
+type Client struct {
+	conn          io.Writer
+	subscriptions map[string]struct{}
+	subscribeMode bool
+}
+
+func NewClient(conn io.Writer) *Client {
+	return &Client{
+		conn:          conn,
+		subscriptions: make(map[string]struct{}),
+		subscribeMode: false,
+	}
+}
 
 func ReadAndHandleRequest(conn io.ReadWriter) (n int, err error) {
 	c := NewClient(conn)
@@ -44,18 +59,25 @@ func ReadAndHandleRequest(conn io.ReadWriter) (n int, err error) {
 	return bLen, nil
 }
 
-type Client struct {
-	conn          io.Writer
-	subscriptions map[string]struct{}
-	subscribeMode bool
+type Channels struct {
+	Channels map[string][]chan string
+	mu       sync.Mutex
 }
 
-func NewClient(conn io.Writer) *Client {
-	return &Client{
-		conn:          conn,
-		subscriptions: make(map[string]struct{}),
-		subscribeMode: false,
-	}
+func (c *Channels) subscribers(channel string) int {
+	return len(c.Channels[channel])
+}
+
+func (c *Channels) subscribe(channel string) <-chan string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	cn := make(chan string, 1)
+	c.Channels[channel] = append(c.Channels[channel], cn)
+	return cn
+}
+
+var Chans = Channels{
+	Channels: make(map[string][]chan string),
 }
 
 func (c *Client) HandleRequest(w io.Writer, rs []resp.DataType) (err error) {
@@ -93,7 +115,7 @@ func (c *Client) HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 		case "ping":
 			return resp.NewData(resp.Array, "pong", "")
 		case "subscribe":
-			return HandleSubscribe(c, args)
+			return HandleSubscribe(args)
 		case "unsubscribe":
 		case "quit":
 		default:
@@ -104,6 +126,7 @@ func (c *Client) HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 	switch cmd {
 	case "ping":
 		return resp.NewData(resp.String, "PONG")
+
 	case "echo":
 		if len(args) != 1 {
 			return resp.NewData(resp.Error, "wrong number of arguments for 'echo' command")
@@ -162,7 +185,10 @@ func (c *Client) HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 
 	case "subscribe":
 		c.subscribeMode = true
-		return HandleSubscribe(c, args)
+		return HandleSubscribe(args)
+
+	case "publish":
+		return HandlePublish(args)
 
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd)
