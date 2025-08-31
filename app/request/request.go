@@ -11,6 +11,7 @@ import (
 )
 
 func ReadAndHandleRequest(conn io.ReadWriter) (n int, err error) {
+	c := NewClient(conn)
 	// TODO: request > 1024
 	b := make([]byte, 1024)
 	bLen := 0
@@ -23,7 +24,7 @@ func ReadAndHandleRequest(conn io.ReadWriter) (n int, err error) {
 				return bLen, err
 			}
 			if o > 0 {
-				err := HandleRequest(conn, r)
+				err := c.HandleRequest(conn, r)
 				if err != nil {
 					return bLen, err
 				}
@@ -57,8 +58,7 @@ func NewClient(conn io.Writer) *Client {
 	}
 }
 
-func HandleRequest(w io.Writer, rs []resp.DataType) (err error) {
-	c := NewClient(w)
+func (c *Client) HandleRequest(w io.Writer, rs []resp.DataType) (err error) {
 	for _, r := range rs {
 		var res resp.DataType
 		switch r.Type {

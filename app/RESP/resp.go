@@ -31,9 +31,6 @@ func (d *DataType) Is(dataType byte) bool {
 
 func NewData(t byte, data ...any) DataType {
 	d := DataType{Type: t}
-	defer func() {
-		fmt.Println(len(d.Arr), d.Arr == nil)
-	}()
 	if data == nil {
 		return d
 	}
