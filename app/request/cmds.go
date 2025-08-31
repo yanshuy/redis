@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
@@ -305,7 +306,33 @@ func HandleKeys(args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.Array, keys)
 }
 
-func HandleSubscribe(args []resp.DataType) resp.DataType {
+type Channels struct {
+	Channels map[string][]*Client
+	mu       sync.Mutex
+}
+
+func (c *Channels) subscribers(channel string) int {
+	return len(c.Channels[channel])
+}
+
+func (c *Channels) subscribe(channel string, client *Client) {
+	_, ok := client.subscriptions[channel]
+	if !ok {
+		cn := make(chan string, 1)
+		client.messageChan = cn
+		client.subscriptions[channel] = struct{}{}
+
+		c.mu.Lock()
+		c.Channels[channel] = append(c.Channels[channel], client)
+		c.mu.Unlock()
+	}
+}
+
+var Chans = Channels{
+	Channels: make(map[string][]*Client),
+}
+
+func HandleSubscribe(c *Client, args []resp.DataType) resp.DataType {
 	if len(args) != 1 {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'config' command")
 	}
@@ -314,8 +341,8 @@ func HandleSubscribe(args []resp.DataType) resp.DataType {
 		return resp.NewData(resp.Error, "channel name must be a string length > 0")
 	}
 
-	Chans.subscribe(channel)
-	return resp.NewData(resp.Array, []string{"subscribe", channel}, resp.NewData(resp.Integer, int64(Chans.subscribers(channel))))
+	Chans.subscribe(channel, c)
+	return resp.NewData(resp.Array, []string{"subscribe", channel}, resp.NewData(resp.Integer, int64(len(c.subscriptions))))
 }
 
 func HandlePublish(args []resp.DataType) resp.DataType {

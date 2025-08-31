@@ -5,7 +5,6 @@ import (
 	"io"
 	"log"
 	"strings"
-	"sync"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
@@ -14,14 +13,17 @@ import (
 type Client struct {
 	conn          io.Writer
 	subscriptions map[string]struct{}
-	subscribeMode bool
+	messageChan   <-chan string
+}
+
+func (c *Client) inSubscribeMode() bool {
+	return len(c.subscriptions) > 0
 }
 
 func NewClient(conn io.Writer) *Client {
 	return &Client{
 		conn:          conn,
 		subscriptions: make(map[string]struct{}),
-		subscribeMode: false,
 	}
 }
 
@@ -59,27 +61,6 @@ func ReadAndHandleRequest(conn io.ReadWriter) (n int, err error) {
 	return bLen, nil
 }
 
-type Channels struct {
-	Channels map[string][]chan string
-	mu       sync.Mutex
-}
-
-func (c *Channels) subscribers(channel string) int {
-	return len(c.Channels[channel])
-}
-
-func (c *Channels) subscribe(channel string) <-chan string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	cn := make(chan string, 1)
-	c.Channels[channel] = append(c.Channels[channel], cn)
-	return cn
-}
-
-var Chans = Channels{
-	Channels: make(map[string][]chan string),
-}
-
 func (c *Client) HandleRequest(w io.Writer, rs []resp.DataType) (err error) {
 	for _, r := range rs {
 		var res resp.DataType
@@ -110,12 +91,12 @@ func (c *Client) HandleRequest(w io.Writer, rs []resp.DataType) (err error) {
 func (c *Client) HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 	cmd = strings.ToLower(cmd)
 
-	if c.subscribeMode {
+	if c.inSubscribeMode() {
 		switch cmd {
 		case "ping":
 			return resp.NewData(resp.Array, "pong", "")
 		case "subscribe":
-			return HandleSubscribe(args)
+			return HandleSubscribe(c, args)
 		case "unsubscribe":
 		case "quit":
 		default:
@@ -184,8 +165,7 @@ func (c *Client) HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 		return resp.NewData(resp.String, "OK")
 
 	case "subscribe":
-		c.subscribeMode = true
-		return HandleSubscribe(args)
+		return HandleSubscribe(c, args)
 
 	case "publish":
 		return HandlePublish(args)
