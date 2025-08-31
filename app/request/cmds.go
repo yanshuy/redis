@@ -349,7 +349,7 @@ func (c *Channels) unsubscribe(channel string, client *Client) {
 
 func (c *Channels) Publish(channel string, message string) {
 	subs := c.Channels[channel]
-	fmt.Println("sending to", len(subs))
+	fmt.Println("sending to", len(subs), channel)
 	for _, c := range subs {
 		go func() {
 			c.messageChan <- message
@@ -379,6 +379,7 @@ func HandleSubscribe(c *Client, args []resp.DataType) resp.DataType {
 				if s == "" {
 					return
 				}
+				fmt.Println("got msg", s, channel)
 				res := resp.NewData(resp.Array, "message", channel, s)
 				c.conn.Write(res.ToResponse())
 			case <-c.done:
