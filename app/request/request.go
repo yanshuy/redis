@@ -12,8 +12,7 @@ import (
 
 type Client struct {
 	conn          io.Writer
-	subscriptions map[string]struct{}
-	messageChan   chan string
+	subscriptions map[string]chan string
 	done          chan struct{}
 }
 
@@ -23,9 +22,8 @@ func (c *Client) inSubscribeMode() bool {
 
 func NewClient(conn io.Writer) *Client {
 	return &Client{
-		conn:          conn,
-		subscriptions: make(map[string]struct{}),
-		done:          make(chan struct{}),
+		conn: conn,
+		done: make(chan struct{}),
 	}
 }
 

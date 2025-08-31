@@ -316,44 +316,63 @@ func (c *Channels) subscribers(channel string) int {
 }
 
 func (c *Channels) subscribe(channel string, client *Client) {
-	_, ok := client.subscriptions[channel]
-	if !ok {
-		cn := make(chan string, 1)
-		client.messageChan = cn
-		client.subscriptions[channel] = struct{}{}
-
-		c.mu.Lock()
-		c.Channels[channel] = append(c.Channels[channel], client)
-		c.mu.Unlock()
+	if client.subscriptions == nil {
+		client.subscriptions = make(map[string]chan string)
 	}
+	if _, ok := client.subscriptions[channel]; ok {
+		return
+	}
+	cn := make(chan string, 1)
+	client.subscriptions[channel] = cn
+	c.mu.Lock()
+	c.Channels[channel] = append(c.Channels[channel], client)
+	c.mu.Unlock()
+
+	go func(channel string, cn chan string) {
+		for {
+			select {
+			case msg, ok := <-cn:
+				if !ok {
+					return
+				}
+				res := resp.NewData(resp.Array, "message", channel, msg)
+				client.conn.Write(res.ToResponse())
+			case <-client.done:
+				return
+			}
+		}
+	}(channel, cn)
 }
 
 func (c *Channels) unsubscribe(channel string, client *Client) {
-	_, ok := client.subscriptions[channel]
+	ch, ok := client.subscriptions[channel]
 	if ok {
 		c.mu.Lock()
 		subs := c.Channels[channel]
 		for i, c := range subs {
 			if c == client {
 				subs = append(subs[:i], subs[i+1:]...)
+				break
 			}
 		}
+		if len(subs) == 0 {
+			delete(c.Channels, channel)
+		}
+		c.mu.Unlock()
+
+		close(ch)
 		delete(client.subscriptions, channel)
 		if len(client.subscriptions) == 0 {
 			client.done <- struct{}{}
 		}
-		close(client.messageChan)
-		c.mu.Unlock()
 	}
 }
 
 func (c *Channels) Publish(channel string, message string) {
 	subs := c.Channels[channel]
-	fmt.Println("sending to", len(subs), channel)
-	for _, c := range subs {
-		go func() {
-			c.messageChan <- message
-		}()
+	for _, client := range subs {
+		ch := client.subscriptions[channel]
+		ch <- message
 	}
 }
 
@@ -372,23 +391,11 @@ func HandleSubscribe(c *Client, args []resp.DataType) resp.DataType {
 
 	Chans.subscribe(channel, c)
 
-	go func() {
-		for {
-			select {
-			case s := <-c.messageChan:
-				if s == "" {
-					return
-				}
-				fmt.Println("got msg", s, channel)
-				res := resp.NewData(resp.Array, "message", channel, s)
-				c.conn.Write(res.ToResponse())
-			case <-c.done:
-				return
-			}
-		}
-	}()
-
-	return resp.NewData(resp.Array, []string{"subscribe", channel}, resp.NewData(resp.Integer, int64(len(c.subscriptions))))
+	return resp.NewData(
+		resp.Array,
+		[]string{"subscribe", channel},
+		resp.NewData(resp.Integer, int64(len(c.subscriptions))),
+	)
 }
 
 func HandlePublish(args []resp.DataType) resp.DataType {
