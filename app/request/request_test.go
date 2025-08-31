@@ -297,3 +297,13 @@ func Test_func(t *testing.T) {
 	j := path.Join("/root", store.RDB.Config["dir"], store.RDB.Config["dbfilename"])
 	fmt.Println(j)
 }
+
+func TestLrange_emptyArray(t *testing.T) {
+	resetStore()
+	payload := "*4\r\n$6\r\nLRANGE\r\n$5\r\nmango\r\n$2\r\n-1\r\n$2\r\n-2\r\n"
+	conn := newRW(payload)
+	_, err := ReadAndHandleRequest(conn)
+	require.NoError(t, err)
+	out := conn.Output()
+	fmt.Println(out)
+}

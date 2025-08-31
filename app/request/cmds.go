@@ -304,3 +304,14 @@ func HandleKeys(args []resp.DataType) resp.DataType {
 	keys := store.RDB.Keys(pattern)
 	return resp.NewData(resp.Array, keys)
 }
+
+func HandleSubscribe(args []resp.DataType) resp.DataType {
+	if len(args) != 1 {
+		return resp.NewData(resp.Error, "wrong number of arguments for 'config' command")
+	}
+	channel := args[0].Str
+	if channel == "" {
+		return resp.NewData(resp.Error, "channel name must be a string length > 0")
+	}
+	return resp.NewData(resp.Array, []string{"subscribe", channel}, resp.NewData(resp.Integer, int64(1)))
+}

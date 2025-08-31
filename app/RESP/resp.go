@@ -30,49 +30,53 @@ func (d *DataType) Is(dataType byte) bool {
 }
 
 func NewData(t byte, data ...any) DataType {
-	for _, item := range data {
-		d := DataType{Type: t}
-		switch t {
-		case Error:
-			d.Str = item.(string)
-			return d
-		case String, BulkString:
-			d.Str = item.(string)
-			return d
-		case Integer:
-			d.Int = item.(int64)
-			return d
-		case Array:
-			if data == nil {
-				return d
-			}
-			switch v := item.(type) {
+	d := DataType{Type: t}
+	defer func() {
+		fmt.Println(len(d.Arr), d.Arr == nil)
+	}()
+	if data == nil {
+		return d
+	}
+	datum := data[0]
+	switch t {
+	case Error:
+		d.Str = datum.(string)
+		return d
+	case String, BulkString:
+		d.Str = datum.(string)
+		return d
+	case Integer:
+		d.Int = datum.(int64)
+		return d
+	case Array:
+		for _, datum := range data {
+			switch v := datum.(type) {
+			case DataType:
+				d.Arr = append(d.Arr, v)
 			case []string:
-				if len(v) != 0 {
-					for _, elem := range v {
-						s := NewData(BulkString, elem)
-						d.Arr = append(d.Arr, s)
-					}
-				} else {
+				if len(v) == 0 {
 					d.Arr = []DataType{}
+					return d
+				}
+				for _, elem := range v {
+					s := NewData(BulkString, elem)
+					d.Arr = append(d.Arr, s)
 				}
 			case string:
 				s := NewData(BulkString, v)
 				d.Arr = append(d.Arr, s)
 			}
-			return d
-
-		default:
-			if err, ok := item.(error); ok {
-				d.Type = Error
-				d.Str = err.Error()
-				return d
-			}
-			log.Fatal("unknown data type encountered:", item)
+		}
+		return d
+	default:
+		if err, ok := datum.(error); ok {
+			d.Type = Error
+			d.Str = err.Error()
 			return d
 		}
+		log.Fatal("unknown data type encountered:", data)
+		return d
 	}
-	return DataType{Type: t}
 }
 
 func (d *DataType) String() string {
@@ -145,7 +149,6 @@ func (d *DataType) ToResponse() []byte {
 		return res
 
 	case Array:
-		fmt.Println("to res of arr", d.Arr == nil, len(d.Arr))
 		if d.Arr == nil {
 			return []byte("*-1\r\n")
 		}
@@ -157,7 +160,6 @@ func (d *DataType) ToResponse() []byte {
 		for _, sd := range d.Arr {
 			res = append(res, sd.ToResponse()...)
 		}
-		fmt.Println("to res of safe", d.Arr == nil, len(d.Arr))
 		return res
 
 	default:

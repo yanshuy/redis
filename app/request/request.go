@@ -131,6 +131,9 @@ func HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 		}
 		return resp.NewData(resp.String, "OK")
 
+	case "subscribe":
+		return HandleSubscribe(args)
+
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd)
 		return resp.NewData(resp.Error, msg)

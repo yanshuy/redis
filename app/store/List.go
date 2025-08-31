@@ -94,7 +94,7 @@ func (rs *RedisStore) Lrange(key string, startIdx int, endIdx int) ([]string, er
 		return items, nil
 
 	} else {
-		return nil, nil
+		return []string{}, nil
 	}
 }
 
