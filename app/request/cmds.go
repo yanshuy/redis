@@ -328,6 +328,25 @@ func (c *Channels) subscribe(channel string, client *Client) {
 	}
 }
 
+func (c *Channels) unsubscribe(channel string, client *Client) {
+	_, ok := client.subscriptions[channel]
+	if ok {
+		c.mu.Lock()
+		subs := c.Channels[channel]
+		for i, c := range subs {
+			if c == client {
+				subs = append(subs[:i], subs[i+1:]...)
+			}
+		}
+		delete(client.subscriptions, channel)
+		if len(client.subscriptions) == 0 {
+			client.done <- struct{}{}
+		}
+		close(client.messageChan)
+		c.mu.Unlock()
+	}
+}
+
 func (c *Channels) Publish(channel string, message string) {
 	subs := c.Channels[channel]
 	for _, c := range subs {
@@ -356,6 +375,9 @@ func HandleSubscribe(c *Client, args []resp.DataType) resp.DataType {
 		for {
 			select {
 			case s := <-c.messageChan:
+				if s == "" {
+					return
+				}
 				res := resp.NewData(resp.Array, "message", channel, s)
 				c.conn.Write(res.ToResponse())
 			case <-c.done:
@@ -382,4 +404,16 @@ func HandlePublish(args []resp.DataType) resp.DataType {
 
 	Chans.Publish(channel, message)
 	return resp.NewData(resp.Integer, int64(Chans.subscribers(channel)))
+}
+
+func HandleUnsubscribe(c *Client, args []resp.DataType) resp.DataType {
+	if len(args) != 1 {
+		return resp.NewData(resp.Error, "wrong number of arguments for 'config' command")
+	}
+	channel := args[0].Str
+	if channel == "" {
+		return resp.NewData(resp.Error, "channel name must be a string length > 0")
+	}
+	Chans.unsubscribe(channel, c)
+	return resp.NewData(resp.Array, "unsubscribe", channel, int64(len(c.subscriptions)))
 }

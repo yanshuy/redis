@@ -100,6 +100,7 @@ func (c *Client) HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 		case "subscribe":
 			return HandleSubscribe(c, args)
 		case "unsubscribe":
+			return HandleUnsubscribe(c, args)
 		case "quit":
 		default:
 			return resp.NewData(resp.Error, fmt.Sprintf("Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", cmd))
