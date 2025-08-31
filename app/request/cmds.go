@@ -369,6 +369,8 @@ func (c *Channels) unsubscribe(channel string, client *Client) {
 }
 
 func (c *Channels) Publish(channel string, message string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	subs := c.Channels[channel]
 	for _, client := range subs {
 		ch := client.subscriptions[channel]
