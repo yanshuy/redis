@@ -59,6 +59,9 @@ func NewData(t byte, data ...any) DataType {
 			case string:
 				s := NewData(BulkString, v)
 				d.Arr = append(d.Arr, s)
+			case int64:
+				s := NewData(Integer, v)
+				d.Arr = append(d.Arr, s)
 			}
 		}
 		return d
