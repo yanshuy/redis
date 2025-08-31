@@ -92,10 +92,21 @@ func (c *Client) HandleRequest(w io.Writer, rs []resp.DataType) (err error) {
 }
 
 func (c *Client) HandleCmd(cmd string, args []resp.DataType) resp.DataType {
-	if c.subscribeMode {
+	cmd = strings.ToLower(cmd)
 
+	if c.subscribeMode {
+		switch cmd {
+		case "ping":
+		case "subscribe":
+			return HandleSubscribe(c, args)
+		case "unsubscribe":
+		case "quit":
+		default:
+			return resp.NewData(resp.Error, fmt.Sprintf("Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", cmd))
+		}
 	}
-	switch strings.ToLower(cmd) {
+
+	switch cmd {
 	case "echo":
 		if len(args) != 1 {
 			return resp.NewData(resp.Error, "wrong number of arguments for 'echo' command")
