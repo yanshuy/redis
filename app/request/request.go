@@ -91,7 +91,7 @@ func (c *Client) HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 	if c.subscribeMode {
 		switch cmd {
 		case "ping":
-			return resp.NewData(resp.Array, "PONG", "")
+			return resp.NewData(resp.Array, "pong", "")
 		case "subscribe":
 			return HandleSubscribe(c, args)
 		case "unsubscribe":

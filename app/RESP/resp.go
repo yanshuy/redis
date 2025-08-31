@@ -129,11 +129,11 @@ func (d *DataType) ToResponse() []byte {
 	case BulkString:
 		first := string(BulkString) + strconv.Itoa(len(d.Str)) + crlf
 		res := make([]byte, 0, len(first)+len(d.Str)+2)
-		if d.Str == "" {
-			res = append(res, BulkString)
-			res = fmt.Append(res, "-1"+crlf)
-			return res
-		}
+		// if d.Str == "" {
+		// 	res = append(res, BulkString)
+		// 	res = fmt.Append(res, "-1"+crlf)
+		// 	return res
+		// }
 		res = fmt.Append(res, first)
 		res = fmt.Append(res, d.Str+crlf)
 		return res
