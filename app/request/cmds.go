@@ -349,36 +349,38 @@ func (c *Channels) unsubscribe(channel string, client *Client) {
 	if ok {
 		c.mu.Lock()
 		subs := c.Channels[channel]
-		fmt.Println("before", len(subs))
 		for i, c := range subs {
 			if c == client {
 				subs = append(subs[:i], subs[i+1:]...)
 				break
 			}
 		}
-		fmt.Println("after", len(subs))
 		if len(subs) == 0 {
 			delete(c.Channels, channel)
+		} else {
+			c.Channels[channel] = subs
 		}
 		c.mu.Unlock()
 
 		close(ch)
 		delete(client.subscriptions, channel)
-		fmt.Println("after", len(client.subscriptions))
 		if len(client.subscriptions) == 0 {
 			client.done <- struct{}{}
 		}
 	}
 }
 
-func (c *Channels) Publish(channel string, message string) {
+func (c *Channels) Publish(channel string, message string) int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	delivered := 0
 	subs := c.Channels[channel]
 	for _, client := range subs {
 		ch := client.subscriptions[channel]
 		ch <- message
+		delivered++
 	}
+	return delivered
 }
 
 var Chans = Channels{
@@ -416,8 +418,8 @@ func HandlePublish(args []resp.DataType) resp.DataType {
 		return resp.NewData(resp.Error, "message name must be a string length > 0")
 	}
 
-	Chans.Publish(channel, message)
-	return resp.NewData(resp.Integer, int64(Chans.subscribers(channel)))
+	n := Chans.Publish(channel, message)
+	return resp.NewData(resp.Integer, int64(n))
 }
 
 func HandleUnsubscribe(c *Client, args []resp.DataType) resp.DataType {
