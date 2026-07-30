@@ -45,8 +45,13 @@ func NewData(t byte, data ...any) DataType {
 	case Array:
 		for _, datum := range data {
 			switch v := datum.(type) {
+			case []DataType:
+				d.Arr = v
 			case DataType:
 				d.Arr = append(d.Arr, v)
+			case string:
+				s := NewData(BulkString, v)
+				d.Arr = append(d.Arr, s)
 			case []string:
 				if len(v) == 0 {
 					d.Arr = []DataType{}
@@ -56,9 +61,6 @@ func NewData(t byte, data ...any) DataType {
 					s := NewData(BulkString, elem)
 					d.Arr = append(d.Arr, s)
 				}
-			case string:
-				s := NewData(BulkString, v)
-				d.Arr = append(d.Arr, s)
 			case int64:
 				s := NewData(Integer, v)
 				d.Arr = append(d.Arr, s)

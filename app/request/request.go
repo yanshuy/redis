@@ -122,17 +122,7 @@ func (c *Client) HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 		return HandleCmdSet(args)
 
 	case "acl":
-		if len(args) > 0 {
-			sub := strings.ToLower(args[0].Str)
-			switch sub {
-			case "whoami":
-				return ACL_WHOAMI()
-			default:
-				panic("situation not handled here")
-			}
-		} else {
-			panic("situation not handled")
-		}
+		return HandleCmdACL(args)
 
 	case "rpush":
 		return HandleRpush(args)

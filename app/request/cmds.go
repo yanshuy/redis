@@ -433,3 +433,23 @@ func HandleUnsubscribe(c *Client, args []resp.DataType) resp.DataType {
 	Chans.unsubscribe(channel, c)
 	return resp.NewData(resp.Array, "unsubscribe", channel, int64(len(c.subscriptions)))
 }
+
+func HandleCmdACL(args []resp.DataType) resp.DataType {
+	if len(args) >= 1 {
+		sub := strings.ToLower(args[0].Str)
+		switch sub {
+		case "whoami":
+			return ACL_WHOAMI()
+		case "getuser":
+			if len(args) >= 2 {
+				return ACL_GETUSER(args[1])
+			} else {
+				panic("getusername : got no user name")
+			}
+		default:
+			panic("situation not handled here")
+		}
+	} else {
+		panic("ACL what?")
+	}
+}
