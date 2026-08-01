@@ -2,6 +2,7 @@ package request
 
 import (
 	"crypto/sha256"
+	"fmt"
 	"strings"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
@@ -18,7 +19,11 @@ func (u *User) ToRESP() resp.Data {
 	flags_v := resp.NewData(resp.Array, u.flags.ToSlice())
 
 	passwords := resp.NewData(resp.BulkString, "passwords")
-	passwords_v := resp.NewData(resp.Array, u.passwords.ToSlice())
+	passStrs := make([]string, 0, len(u.passwords))
+	for p := range u.passwords {
+		passStrs = append(passStrs, fmt.Sprintf("%x", p))
+	}
+	passwords_v := resp.NewData(resp.Array, passStrs)
 
 	res := []resp.Data{flags, flags_v, passwords, passwords_v}
 	return resp.NewData(resp.Array, res)
@@ -42,7 +47,7 @@ func ACL_GETUSER(username string) resp.Data {
 	if user, ok := users[username]; ok {
 		return user.ToRESP()
 	} else {
-		return resp.NewData(resp.Error, "User does not exist.")
+		return Err("User does not exist.")
 	}
 }
 
@@ -57,7 +62,7 @@ func ACL_SETUSER(username string, rule string) resp.Data {
 		}
 		return resp.NewData(resp.String, "OK")
 	} else {
-		return resp.NewData(resp.Error, "User does not exist.")
+		return Err("User does not exist.")
 	}
 }
 
@@ -68,10 +73,10 @@ func Authenticate(username string, password string) resp.Data {
 		if user.passwords.Contains(calc) {
 			return resp.NewData(resp.String, "OK")
 		}
-		return resp.NewData(resp.Error, "WRONGPASS invalid username-password pair or user is disabled.")
+		return WrongPass()
 
 	} else {
-		return resp.NewData(resp.Error, "User does not exist.")
+		return Err("User does not exist.")
 	}
 }
 

@@ -12,11 +12,11 @@ import (
 
 func HandleCmdGet(args []resp.Data) resp.Data {
 	if len(args) != 1 {
-		return resp.NewData(resp.Error, "wrong number of arguments for 'get' command")
+		return WrongArgs("get")
 	}
 	key := args[0].Str
 	if key == "" {
-		return resp.NewData(resp.Error, "key must be a string length > 0")
+		return Err("key must be a string length > 0")
 	}
 	if val, ok := store.RDB.Get(key); ok {
 		return resp.NewData(resp.BulkString, val)
@@ -27,12 +27,12 @@ func HandleCmdGet(args []resp.Data) resp.Data {
 
 func HandleCmdSet(args []resp.Data) resp.Data {
 	if len(args) < 2 {
-		return resp.NewData(resp.Error, "wrong number of arguments for 'set' command")
+		return WrongArgs("set")
 	}
 	key := args[0].Str
 	val := args[1].Str
 	if key == "" || val == "" {
-		return resp.NewData(resp.Error, "key, val must be a string length > 0")
+		return Err("key, val must be a string length > 0")
 	}
 	var expiry int64
 	if len(args) >= 4 {
@@ -41,7 +41,7 @@ func HandleCmdSet(args []resp.Data) resp.Data {
 		case "px", "ex":
 			exp, err := args[3].Integer()
 			if err != nil {
-				return resp.NewData(resp.Error, "wrong expiry time expected a number")
+				return Err("wrong expiry time expected a number")
 			}
 			if arg == "ex" {
 				expiry = exp * 1000
@@ -50,7 +50,7 @@ func HandleCmdSet(args []resp.Data) resp.Data {
 			}
 
 		default:
-			return resp.NewData(resp.Error, "unknown argument for 'set' command")
+			return Err("unknown argument for 'set' command")
 		}
 	}
 
@@ -60,69 +60,69 @@ func HandleCmdSet(args []resp.Data) resp.Data {
 
 func HandleRpush(args []resp.Data) resp.Data {
 	if len(args) < 2 {
-		return resp.NewData(resp.Error, "wrong number of arguments for 'rpush' command")
+		return WrongArgs("rpush")
 	}
 	key := args[0].Str
 	if key == "" {
-		return resp.NewData(resp.Error, "key must be a string length > 0")
+		return Err("key must be a string length > 0")
 	}
 	strArgs := make([]string, 0, len(args)-1)
 	for _, arg := range args[1:] {
 		if arg.Is(resp.BulkString) {
 			strArgs = append(strArgs, arg.Str)
 		} else {
-			return resp.NewData(resp.Error, "invalid argument type for 'rpush' command expects only string")
+			return Err("invalid argument type for 'rpush' command expects only string")
 		}
 	}
 	l, err := store.RDB.Rpush(key, strArgs)
 	if err != nil {
-		return resp.NewData(resp.Error, err.Error())
+		return Err(err.Error())
 	}
 	return resp.NewData(resp.Integer, int64(l))
 }
 
 func HandleLpush(args []resp.Data) resp.Data {
 	if len(args) < 2 {
-		return resp.NewData(resp.Error, "wrong number of arguments for 'lpush' command")
+		return WrongArgs("lpush")
 	}
 	key := args[0].Str
 	if key == "" {
-		return resp.NewData(resp.Error, "key must be a string length > 0")
+		return Err("key must be a string length > 0")
 	}
 	strArgs := make([]string, 0, len(args)-1)
 	for _, arg := range args[1:] {
 		if arg.Is(resp.BulkString) {
 			strArgs = append(strArgs, arg.Str)
 		} else {
-			return resp.NewData(resp.Error, "invalid argument type for 'lpush' command expects only string")
+			return Err("invalid argument type for 'lpush' command expects only string")
 		}
 	}
 	l, err := store.RDB.Lpush(key, strArgs)
 	if err != nil {
-		return resp.NewData(resp.Error, err.Error())
+		return Err(err.Error())
 	}
 	return resp.NewData(resp.Integer, int64(l))
 }
 
 func HandleLpop(args []resp.Data) resp.Data {
 	if len(args) < 1 || len(args) > 2 {
-		return resp.NewData(resp.Error, "wrong number of arguments for 'lpop' command")
+		return WrongArgs("lpop")
 	}
 	key := args[0].Str
 	if key == "" {
-		return resp.NewData(resp.Error, "key must be a string length > 0")
+		return Err("key must be a string length > 0")
 	}
 	pops := 1
 	if len(args) == 2 {
 		p, err := args[1].Integer()
 		if err != nil {
-			return resp.NewData(resp.Error, "2nd argument must be a integer")
+			return Err("2nd argument must be a integer")
 		}
 		pops = int(p)
 	}
 	l, err := store.RDB.Lpop(key, pops)
 	if err != nil {
-		return resp.NewData(resp.Error, err.Error())
+		return Err(err.Error())
 	}
 	switch len(l) {
 	case 0:
@@ -136,58 +136,58 @@ func HandleLpop(args []resp.Data) resp.Data {
 
 func HandleLlen(args []resp.Data) resp.Data {
 	if len(args) != 1 {
-		return resp.NewData(resp.Error, "wrong number of arguments for 'llen' command")
+		return WrongArgs("llen")
 	}
 	key := args[0].Str
 	if key == "" {
-		return resp.NewData(resp.Error, "key must be a string length > 0")
+		return Err("key must be a string length > 0")
 	}
 	l, err := store.RDB.Llen(key)
 	if err != nil {
-		return resp.NewData(resp.Error, err.Error())
+		return Err(err.Error())
 	}
 	return resp.NewData(resp.Integer, int64(l))
 }
 
 func HandleLrange(args []resp.Data) resp.Data {
 	if len(args) != 3 {
-		return resp.NewData(resp.Error, "wrong number of arguments for 'lrange' command")
+		return WrongArgs("lrange")
 	}
 	key := args[0].Str
 	if key == "" {
-		return resp.NewData(resp.Error, "key, val must be a string length > 0")
+		return Err("key, val must be a string length > 0")
 	}
 	startIdx, err := args[1].Integer()
 	if err != nil {
-		return resp.NewData(resp.Error, "expected start index to be an integer for 'lrange' command")
+		return Err("expected start index to be an integer for 'lrange' command")
 	}
 	endIdx, err := args[2].Integer()
 	if err != nil {
-		return resp.NewData(resp.Error, "expected end index to be an integer for 'lrange' command")
+		return Err("expected end index to be an integer for 'lrange' command")
 	}
 	elems, err := store.RDB.Lrange(key, int(startIdx), int(endIdx))
 	if err != nil {
-		return resp.NewData(resp.Error, err.Error())
+		return Err(err.Error())
 	}
 	return resp.NewData(resp.Array, elems)
 }
 
 func HandleBlpop(args []resp.Data) resp.Data {
 	if len(args) != 2 {
-		return resp.NewData(resp.Error, "wrong number of arguments for 'blpop' command")
+		return WrongArgs("blpop")
 	}
 	key := args[0].Str
 	if key == "" {
-		return resp.NewData(resp.Error, "key, val must be a string length > 0")
+		return Err("key, val must be a string length > 0")
 	}
 	timeout_s, err := strconv.ParseFloat(args[1].Str, 10)
 	if err != nil {
-		return resp.NewData(resp.Error, "expected 2 argument to be an number for 'blpop' command")
+		return Err("expected 2 argument to be an number for 'blpop' command")
 	}
 
 	msgChan, err := store.RDB.Blpop(key, timeout_s)
 	if err != nil {
-		return resp.NewData(resp.Error, err.Error())
+		return Err(err.Error())
 	}
 	s := <-msgChan
 	if s == "" {
@@ -198,11 +198,11 @@ func HandleBlpop(args []resp.Data) resp.Data {
 
 func HandleType(args []resp.Data) resp.Data {
 	if len(args) != 1 {
-		return resp.NewData(resp.Error, "wrong number of arguments for 'blpop' command")
+		return WrongArgs("type")
 	}
 	key := args[0].Str
 	if key == "" {
-		return resp.NewData(resp.Error, "key, val must be a string length > 0")
+		return Err("key, val must be a string length > 0")
 	}
 	t := store.RDB.Type(key)
 	return resp.NewData(resp.String, t)
@@ -210,50 +210,50 @@ func HandleType(args []resp.Data) resp.Data {
 
 func HandleXadd(args []resp.Data) resp.Data {
 	if len(args) < 2 {
-		return resp.NewData(resp.Error, "wrong number of arguments for 'xadd' command")
+		return WrongArgs("xadd")
 	}
 	key := args[0].Str
 	stream_key := args[1].Str
 	if key == "" || stream_key == "" {
-		return resp.NewData(resp.Error, "key, val must be a string length > 0")
+		return Err("key, val must be a string length > 0")
 	}
 	rest := args[2:]
 	key_vals := make([]string, 0, len(args[2:]))
 	for i := 0; i < len(rest); i += 2 {
 		key := rest[i]
 		if key.Str == "" {
-			return resp.NewData(resp.Error, "key, val must be a string length > 0")
+			return Err("key, val must be a string length > 0")
 		}
 		if i+1 > len(rest) {
-			return resp.NewData(resp.Error, fmt.Sprintf("no value for the key %s specified", key.Str))
+			return Err(fmt.Sprintf("no value for the key %s specified", key.Str))
 		}
 		val := rest[i+1]
 		if val.Str == "" {
-			return resp.NewData(resp.Error, "key, val must be a string length > 0")
+			return Err("key, val must be a string length > 0")
 		}
 		key_vals = append(key_vals, key.Str, val.Str)
 	}
 	s, err := store.RDB.Xadd(key, stream_key, key_vals)
 	if err != nil {
-		return resp.NewData(resp.Error, err.Error())
+		return Err(err.Error())
 	}
 	return resp.NewData(resp.BulkString, s)
 }
 
 func HandleXrange(args []resp.Data) resp.Data {
 	if len(args) != 3 {
-		return resp.NewData(resp.Error, "wrong number of arguments for 'xadd' command")
+		return WrongArgs("xrange")
 	}
 	key := args[0].Str
 	if key == "" {
-		return resp.NewData(resp.Error, "key, val must be a string length > 0")
+		return Err("key, val must be a string length > 0")
 	}
 	startStr := args[1].Str
 	endStr := args[2].Str
 
 	entries, err := store.RDB.XRange(key, startStr, endStr)
 	if err != nil {
-		return resp.NewData(resp.Error, err.Error())
+		return Err(err.Error())
 	}
 
 	res := resp.NewData(resp.Array)
@@ -274,20 +274,23 @@ func HandleXread(args []resp.Data) resp.Data {
 
 func HandleConfig(args []resp.Data) resp.Data {
 	if len(args) < 2 {
-		return resp.NewData(resp.Error, "wrong number of arguments for 'config' command")
+		return WrongArgs("config")
 	}
+
 	sub := strings.ToLower(args[0].Str)
+
 	if sub == "get" {
 		strArgs := make([]string, 0, len(args))
 		for _, arg := range args[1:] {
 			if arg.Str == "" {
-				return resp.NewData(resp.Error, "argument must be a string length > 0")
+				return Err("argument must be a string length > 0")
 			}
 			strArgs = append(strArgs, arg.Str)
 		}
+
 		configs, err := store.RDB.ConfigGet(strArgs)
 		if err != nil {
-			return resp.NewData(resp.Error, err.Error())
+			return Err(err.Error())
 		}
 		return resp.NewData(resp.Array, configs)
 	}
@@ -296,11 +299,11 @@ func HandleConfig(args []resp.Data) resp.Data {
 
 func HandleKeys(args []resp.Data) resp.Data {
 	if len(args) != 1 {
-		return resp.NewData(resp.Error, "wrong number of arguments for 'config' command")
+		return WrongArgs("keys")
 	}
 	pattern := args[0].Str
 	if pattern == "" {
-		return resp.NewData(resp.Error, "key, val must be a string length > 0")
+		return Err("key, val must be a string length > 0")
 	}
 	keys := store.RDB.Keys(pattern)
 	return resp.NewData(resp.Array, keys)
@@ -389,11 +392,11 @@ var Chans = Channels{
 
 func HandleSubscribe(c *Client, args []resp.Data) resp.Data {
 	if len(args) != 1 {
-		return resp.NewData(resp.Error, "wrong number of arguments for 'config' command")
+		return WrongArgs("subscribe")
 	}
 	channel := args[0].Str
 	if channel == "" {
-		return resp.NewData(resp.Error, "channel name must be a string length > 0")
+		return Err("channel name must be a string length > 0")
 	}
 
 	Chans.subscribe(channel, c)
@@ -407,15 +410,15 @@ func HandleSubscribe(c *Client, args []resp.Data) resp.Data {
 
 func HandlePublish(args []resp.Data) resp.Data {
 	if len(args) != 2 {
-		return resp.NewData(resp.Error, "wrong number of arguments for 'config' command")
+		return WrongArgs("publish")
 	}
 	channel := args[0].Str
 	if channel == "" {
-		return resp.NewData(resp.Error, "channel name must be a string length > 0")
+		return Err("channel name must be a string length > 0")
 	}
 	message := args[1].Str
 	if channel == "" {
-		return resp.NewData(resp.Error, "message name must be a string length > 0")
+		return Err("message name must be a string length > 0")
 	}
 
 	n := Chans.Publish(channel, message)
@@ -424,11 +427,11 @@ func HandlePublish(args []resp.Data) resp.Data {
 
 func HandleUnsubscribe(c *Client, args []resp.Data) resp.Data {
 	if len(args) != 1 {
-		return resp.NewData(resp.Error, "wrong number of arguments for 'config' command")
+		return WrongArgs("unsubscribe")
 	}
 	channel := args[0].Str
 	if channel == "" {
-		return resp.NewData(resp.Error, "channel name must be a string length > 0")
+		return Err("channel name must be a string length > 0")
 	}
 	Chans.unsubscribe(channel, c)
 	return resp.NewData(resp.Array, "unsubscribe", channel, int64(len(c.subscriptions)))
@@ -436,69 +439,58 @@ func HandleUnsubscribe(c *Client, args []resp.Data) resp.Data {
 
 func HandleCmdACL(args []resp.Data) resp.Data {
 	if len(args) == 0 {
-		return resp.NewData(resp.Error,
-			"wrong number of arguments for 'acl' command")
+		return WrongArgs("acl")
 	}
 
 	switch strings.ToLower(args[0].Str) {
 	case "whoami":
 		if len(args) != 1 {
-			return resp.NewData(resp.Error,
-				"wrong number of arguments for 'acl|whoami' command")
+			return WrongArgs("acl|whoami")
 		}
 		return ACL_WHOAMI()
 
 	case "getuser":
 		if len(args) != 2 {
-			return resp.NewData(resp.Error,
-				"wrong number of arguments for 'acl|getuser' command")
+			return WrongArgs("acl|getuser")
 		}
 
 		if args[1].Type != resp.BulkString {
-			return resp.NewData(resp.Error,
-				"username must be a bulk string")
+			return Err("username must be a bulk string")
 		}
 
 		return ACL_GETUSER(args[1].Str)
 
 	case "setuser":
 		if len(args) != 3 {
-			return resp.NewData(resp.Error,
-				"wrong number of arguments for 'acl|setuser' command")
+			return WrongArgs("acl|setuser")
 		}
 
 		if args[1].Type != resp.BulkString {
-			return resp.NewData(resp.Error,
-				"username must be a bulk string")
+			return Err("username must be a bulk string")
 		}
 
 		if args[2].Type != resp.BulkString {
-			return resp.NewData(resp.Error,
-				"rule must be a bulk string")
+			return Err("rule must be a bulk string")
 		}
 
 		return ACL_SETUSER(args[1].Str, args[2].Str)
 
 	default:
-		return resp.NewData(resp.Error,
-			"unknown subcommand '"+args[0].Str+"'")
+		return Err("unknown subcommand '" + args[0].Str + "'")
 	}
 }
 
 func HandleCmdAuth(args []resp.Data) resp.Data {
 	if len(args) != 2 {
-		return resp.NewData(resp.Error,
-			"ERR wrong number of arguments for 'auth' command")
+		return WrongArgs("auth")
 	}
 
 	if args[0].Type != resp.BulkString {
-		return resp.NewData(resp.Error,
-			"ERR username must be a bulk string")
+		return Err("username must be a bulk string")
 	}
 
 	if args[1].Type != resp.BulkString {
-		return resp.NewData(resp.Error,
-			"ERR password must be a bulk string")
+		return Err("password must be a bulk string")
 	}
 
 	return Authenticate(args[0].Str, args[1].Str)

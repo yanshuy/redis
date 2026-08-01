@@ -64,18 +64,22 @@ func ReadAndHandleRequest(conn io.ReadWriter) (n int, err error) {
 func (c *Client) HandleRequest(w io.Writer, rs []resp.Data) (err error) {
 	for _, r := range rs {
 		var res resp.Data
-		f := r.Arr[0]
 		switch r.Type {
 		case resp.Array:
+			if len(r.Arr) == 0 {
+				res = Err("invalid command")
+				break
+			}
+			f := r.Arr[0]
 			if f.Str == "" {
-				res = resp.NewData(resp.Error, "invalid command")
+				res = Err("invalid command")
 				break
 			}
 			res = c.HandleCmd(f.Str, r.Arr[1:])
 		case resp.String, resp.BulkString:
-			res = c.HandleCmd(f.Str, nil)
+			res = c.HandleCmd(r.Str, nil)
 		default:
-			res = resp.NewData(resp.Error, "invalid command")
+			res = Err("invalid command")
 		}
 
 		resBytes := res.ToResponse()
@@ -101,7 +105,7 @@ func (c *Client) HandleCmd(cmd string, args []resp.Data) resp.Data {
 			return HandleUnsubscribe(c, args)
 		case "quit":
 		default:
-			return resp.NewData(resp.Error, fmt.Sprintf("Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", cmd))
+			return Err(fmt.Sprintf("Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", cmd))
 		}
 	}
 
@@ -111,7 +115,7 @@ func (c *Client) HandleCmd(cmd string, args []resp.Data) resp.Data {
 
 	case "echo":
 		if len(args) != 1 {
-			return resp.NewData(resp.Error, "wrong number of arguments for 'echo' command")
+			return WrongArgs("echo")
 		}
 		return args[0]
 
@@ -167,7 +171,7 @@ func (c *Client) HandleCmd(cmd string, args []resp.Data) resp.Data {
 		err := store.RDB.SaveRDBSnapshot()
 		if err != nil {
 			log.Println(err)
-			return resp.NewData(resp.Error, "save failed")
+			return Err("save failed")
 		}
 		return resp.NewData(resp.String, "OK")
 
@@ -179,6 +183,28 @@ func (c *Client) HandleCmd(cmd string, args []resp.Data) resp.Data {
 
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd)
-		return resp.NewData(resp.Error, msg)
+		return Err(msg)
 	}
+}
+
+func Err(msg string) resp.Data {
+	return resp.NewData(resp.Error, "ERR "+msg)
+}
+
+func WrongPass() resp.Data {
+	return resp.NewData(resp.Error,
+		"WRONGPASS invalid username-password pair or user is disabled.")
+}
+
+func NoAuth() resp.Data {
+	return resp.NewData(resp.Error,
+		"NOAUTH Authentication required.")
+}
+
+func WrongArgs(cmd string) resp.Data {
+	return Err("wrong number of arguments for '" + cmd + "' command")
+}
+
+func ErrWrongArgs(cmd string) resp.Data {
+	return WrongArgs(cmd)
 }

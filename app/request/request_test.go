@@ -34,13 +34,13 @@ func TestRequest_ECHO_NoArgs(t *testing.T) {
 	conn := newRW("+ECHO\r\n")
 	_, err := ReadAndHandleRequest(conn)
 	require.NoError(t, err)
-	require.Contains(t, conn.Output(), "-ERROR")
+	require.Contains(t, conn.Output(), "-ERR")
 }
 
 func TestRequest_Unknown(t *testing.T) {
 	conn := newRW("+FOO\r\n")
 	ReadAndHandleRequest(conn)
-	require.Contains(t, conn.Output(), "-ERROR")
+	require.Contains(t, conn.Output(), "-ERR")
 }
 
 func TestRequest_ECHO_WithArgs(t *testing.T) {
@@ -50,8 +50,7 @@ func TestRequest_ECHO_WithArgs(t *testing.T) {
 	_, err := ReadAndHandleRequest(conn)
 	fmt.Println(err)
 	require.NoError(t, err)
-	// Current implementation writes plain HELLO (no RESP wrapping)
-	require.Equal(t, "+HELLO\r\n", conn.Output())
+	require.Equal(t, "$5\r\nHELLO\r\n", conn.Output())
 }
 
 func TestRequest_PING_Array(t *testing.T) {
@@ -113,7 +112,7 @@ func TestRequest_SET_WrongArgs(t *testing.T) {
 	conn := newRW(payload)
 	_, err := ReadAndHandleRequest(conn)
 	require.NoError(t, err)
-	require.Contains(t, conn.Output(), "-ERROR")
+	require.Contains(t, conn.Output(), "-ERR")
 }
 
 func TestRequest_GET_WrongArgs(t *testing.T) {
@@ -123,7 +122,7 @@ func TestRequest_GET_WrongArgs(t *testing.T) {
 	conn := newRW(payload)
 	_, err := ReadAndHandleRequest(conn)
 	require.NoError(t, err)
-	require.Contains(t, conn.Output(), "-ERROR")
+	require.Contains(t, conn.Output(), "-ERR")
 }
 
 func TestRequest_Unknown_Array(t *testing.T) {
@@ -132,7 +131,7 @@ func TestRequest_Unknown_Array(t *testing.T) {
 	conn := newRW(payload)
 	_, err := ReadAndHandleRequest(conn)
 	require.NoError(t, err)
-	require.Contains(t, conn.Output(), "-ERROR")
+	require.Contains(t, conn.Output(), "-ERR")
 }
 
 // ---- List command tests (RPUSH / LRANGE) ----
@@ -191,7 +190,7 @@ func TestRequest_RPUSH_WrongArgTypes(t *testing.T) {
 	conn := newRW(payload)
 	_, err := ReadAndHandleRequest(conn)
 	require.NoError(t, err)
-	require.Contains(t, conn.Output(), "-ERROR")
+	require.Contains(t, conn.Output(), "-ERR")
 }
 
 func TestRequest_LPOP_Twice(t *testing.T) {
@@ -210,7 +209,7 @@ func TestRequest_LRANGE_WrongArity(t *testing.T) {
 	conn := newRW(payload)
 	_, err := ReadAndHandleRequest(conn)
 	require.NoError(t, err)
-	require.Contains(t, conn.Output(), "-ERROR")
+	require.Contains(t, conn.Output(), "-ERR")
 }
 
 func TestRequest_LRANGE_NegativeEnd(t *testing.T) {
@@ -271,7 +270,7 @@ func TestRequest_BLpop(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	out := connBL.Output()
 	fmt.Println("BLPOP output:", out)
-	require.Contains(t, out, "-1")
+	require.Contains(t, out, "banana")
 }
 
 func TestRequest_Save(t *testing.T) {
@@ -306,4 +305,14 @@ func TestLrange_emptyArray(t *testing.T) {
 	require.NoError(t, err)
 	out := conn.Output()
 	fmt.Println(out)
+}
+
+func TestRequest_ACL_GETUSER_Default(t *testing.T) {
+	resetStore()
+	payload := "*3\r\n$3\r\nACL\r\n$7\r\nGETUSER\r\n$7\r\ndefault\r\n"
+	conn := newRW(payload)
+	_, err := ReadAndHandleRequest(conn)
+	require.NoError(t, err)
+	out := conn.Output()
+	require.Contains(t, out, "$9\r\npasswords\r\n*0\r\n")
 }

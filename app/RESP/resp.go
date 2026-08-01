@@ -44,6 +44,9 @@ func NewData(t byte, data ...any) Data {
 		return d
 	case Array:
 		for _, datum := range data {
+			if datum == nil {
+				return d
+			}
 			switch v := datum.(type) {
 			case []Data:
 				d.Arr = v
@@ -64,6 +67,8 @@ func NewData(t byte, data ...any) Data {
 			case int64:
 				s := NewData(Integer, v)
 				d.Arr = append(d.Arr, s)
+			default:
+				panic("unhandled case")
 			}
 		}
 		return d
@@ -116,10 +121,10 @@ func (d *Data) ToResponse() []byte {
 	crlf := "\r\n"
 	switch d.Type {
 	case Error:
-		res := make([]byte, 0, 1+6+len(d.Str)+2)
+		res := make([]byte, 0, 1+len(d.Str)+2)
 		res = append(res, Error)
-		res = fmt.Append(res, "ERR ")
-		res = fmt.Append(res, d.Str+crlf)
+		res = fmt.Append(res, d.Str)
+		res = fmt.Append(res, crlf)
 		return res
 
 	case String:
