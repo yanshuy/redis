@@ -437,26 +437,26 @@ func HandleUnsubscribe(c *Client, args []resp.Data) resp.Data {
 func HandleCmdACL(args []resp.Data) resp.Data {
 	if len(args) == 0 {
 		return resp.NewData(resp.Error,
-			"ERR wrong number of arguments for 'acl' command")
+			"wrong number of arguments for 'acl' command")
 	}
 
 	switch strings.ToLower(args[0].Str) {
 	case "whoami":
 		if len(args) != 1 {
 			return resp.NewData(resp.Error,
-				"ERR wrong number of arguments for 'acl|whoami' command")
+				"wrong number of arguments for 'acl|whoami' command")
 		}
 		return ACL_WHOAMI()
 
 	case "getuser":
 		if len(args) != 2 {
 			return resp.NewData(resp.Error,
-				"ERR wrong number of arguments for 'acl|getuser' command")
+				"wrong number of arguments for 'acl|getuser' command")
 		}
 
 		if args[1].Type != resp.BulkString {
 			return resp.NewData(resp.Error,
-				"ERR username must be a bulk string")
+				"username must be a bulk string")
 		}
 
 		return ACL_GETUSER(args[1].Str)
@@ -464,24 +464,24 @@ func HandleCmdACL(args []resp.Data) resp.Data {
 	case "setuser":
 		if len(args) != 3 {
 			return resp.NewData(resp.Error,
-				"ERR wrong number of arguments for 'acl|setuser' command")
+				"wrong number of arguments for 'acl|setuser' command")
 		}
 
 		if args[1].Type != resp.BulkString {
 			return resp.NewData(resp.Error,
-				"ERR username must be a bulk string")
+				"username must be a bulk string")
 		}
 
 		if args[2].Type != resp.BulkString {
 			return resp.NewData(resp.Error,
-				"ERR rule must be a bulk string")
+				"rule must be a bulk string")
 		}
 
 		return ACL_SETUSER(args[1].Str, args[2].Str)
 
 	default:
 		return resp.NewData(resp.Error,
-			"ERR unknown subcommand '"+args[0].Str+"'")
+			"unknown subcommand '"+args[0].Str+"'")
 	}
 }
 
