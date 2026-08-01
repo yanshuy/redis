@@ -461,7 +461,7 @@ func HandleCmdIncr(args []resp.Data) resp.Data {
 		}
 	} else {
 		store.RDB.Set(key, "1", 0)
-		return resp.NewData(resp.Integer, 1)
+		return resp.NewData(resp.Integer, int64(1))
 	}
 }
 
