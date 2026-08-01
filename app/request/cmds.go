@@ -442,14 +442,32 @@ func HandleCmdACL(args []resp.DataType) resp.DataType {
 			return ACL_WHOAMI()
 		case "getuser":
 			if len(args) >= 2 {
-				return ACL_GETUSER(args[1])
+				username := args[1]
+				if username.Type != resp.BulkString {
+					return resp.NewData(resp.BulkString, "-1")
+				}
+				return ACL_GETUSER(username.Str)
 			} else {
 				panic("getusername : got no user name")
+			}
+		case "setuser":
+			if len(args) >= 3 {
+				username := args[1]
+				if username.Type != resp.BulkString {
+					return resp.NewData(resp.BulkString, "-1")
+				}
+				rule := args[2]
+				if username.Type != resp.BulkString {
+					return resp.NewData(resp.BulkString, "-1")
+				}
+				return ACL_SETUSER(username.Str, rule.Str)
+			} else {
+				panic("setusername : less than expected arguments")
 			}
 		default:
 			panic("situation not handled here")
 		}
 	} else {
-		panic("ACL what?")
+		panic("got 'ACL' expected 'ACL SUBCOMMAND'")
 	}
 }
