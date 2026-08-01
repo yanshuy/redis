@@ -18,8 +18,8 @@ func HandleCmdGet(args []resp.Data) resp.Data {
 	if key == "" {
 		return Err("key must be a string length > 0")
 	}
-	if val, ok := store.RDB.Get(key); ok {
-		return resp.NewData(resp.BulkString, val)
+	if entry := store.RDB.Get(key); entry != nil {
+		return resp.NewData(resp.BulkString, entry.Value)
 	} else {
 		return resp.NewData(resp.BulkString, "-1")
 	}
@@ -441,6 +441,27 @@ func HandleUnsubscribe(c *Client, args []resp.Data) resp.Data {
 	}
 	Chans.unsubscribe(channel, c)
 	return resp.NewData(resp.Array, "unsubscribe", channel, int64(len(c.subscriptions)))
+}
+
+func HandleCmdIncr(args []resp.Data) resp.Data {
+	if len(args) != 1 {
+		return WrongArgs("incr")
+	}
+	key := args[0].Str
+	if key == "" {
+		return Err("key must be a string length > 0")
+	}
+	if entry := store.RDB.Get(key); entry != nil {
+		if i, err := strconv.Atoi(entry.Value); err == nil {
+			i += 1
+			store.RDB.Set(key, strconv.Itoa(i), entry.ExpiryAt)
+			return resp.NewData(resp.Integer, int64(i))
+		} else {
+			panic("unhandles situation")
+		}
+	} else {
+		return resp.NewData(resp.BulkString, "-1")
+	}
 }
 
 func HandleCmdACL(args []resp.Data) resp.Data {

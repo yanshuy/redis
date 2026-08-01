@@ -8,7 +8,7 @@ import (
 )
 
 func (rs *RedisStore) Rpush(key string, val []string) (int, error) {
-	var mem *StoreMember
+	var mem *Value
 	if m, ok := rs.Look(key); ok {
 		if m.data.Type != LIST {
 			return 0, fmt.Errorf("provided key '%s' holds some other data", key)
@@ -24,7 +24,7 @@ func (rs *RedisStore) Rpush(key string, val []string) (int, error) {
 }
 
 func (rs *RedisStore) Lpush(key string, val []string) (int, error) {
-	var mem *StoreMember
+	var mem *Value
 	if m, ok := rs.Look(key); ok {
 		if m.data.Type != LIST {
 			return 0, fmt.Errorf("provided key '%s' does not hold a list", key)

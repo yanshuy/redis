@@ -6,13 +6,13 @@ import (
 	"time"
 )
 
-type StoreMember struct {
+type Value struct {
 	ExpiryAt int64
 	data     Data
 }
 
-func (rs *RedisStore) NewStoreMember(key string, t DataType) *StoreMember {
-	m := &StoreMember{
+func (rs *RedisStore) NewStoreMember(key string, t DataType) *Value {
+	m := &Value{
 		data: Data{Type: t},
 	}
 	rs.Store[key] = m
@@ -20,19 +20,19 @@ func (rs *RedisStore) NewStoreMember(key string, t DataType) *StoreMember {
 }
 
 type RedisStore struct {
-	Store     map[string]*StoreMember
+	Store     map[string]*Value
 	Config    map[string]string
 	Listeners map[string][]chan struct{}
 	mu        sync.Mutex
 }
 
-func (rs *RedisStore) Look(key string) (*StoreMember, bool) {
+func (rs *RedisStore) Look(key string) (*Value, bool) {
 	m, ok := rs.Store[key]
 	return m, ok
 }
 
 var RDB RedisStore = RedisStore{
-	Store:     make(map[string]*StoreMember),
+	Store:     make(map[string]*Value),
 	Config:    make(map[string]string),
 	Listeners: make(map[string][]chan struct{}),
 	mu:        sync.Mutex{},
@@ -68,19 +68,27 @@ func (rs *RedisStore) Set(key string, val string, ttl_ms int64) {
 	}
 }
 
-func (rs *RedisStore) Get(key string) (string, bool) {
+type Entry struct {
+	Value    string
+	ExpiryAt int64
+}
+
+func (rs *RedisStore) Get(key string) *Entry {
 	mem, ok := rs.Store[key]
 	if !ok {
-		return "", false
+		return nil
 	}
 	if mem.ExpiryAt > 0 && mem.ExpiryAt <= time.Now().UnixMilli() {
 		delete(rs.Store, key)
-		return "", false
+		return nil
 	}
 	if mem.data.Type != STRING {
-		return "", false
+		return nil
 	}
-	return mem.data.String, ok
+	return &Entry{
+		Value:    mem.data.String,
+		ExpiryAt: mem.ExpiryAt,
+	}
 }
 
 func (rs *RedisStore) Keys(pattern string) []string {

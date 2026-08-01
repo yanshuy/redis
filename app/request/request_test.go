@@ -73,7 +73,7 @@ func TestRequest_MultipleInOneBuffer(t *testing.T) {
 }
 
 func resetStore() {
-	store.RDB = store.RedisStore{Store: make(map[string]*store.StoreMember), Config: make(map[string]string), Listeners: make(map[string][]chan struct{})}
+	store.RDB = store.RedisStore{Store: make(map[string]*store.Value), Config: make(map[string]string), Listeners: make(map[string][]chan struct{})}
 	store.RDB.InitConfig("dir", "tmp", "dbfilename", "rdb.test")
 }
 

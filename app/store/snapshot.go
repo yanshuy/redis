@@ -359,7 +359,7 @@ func (rs *RedisStore) RestoreRDBSnapshot() (err error) {
 					valBytes := b[i : i+vLen]
 					i += vLen
 
-					rs.Store[string(keyBytes)] = &StoreMember{
+					rs.Store[string(keyBytes)] = &Value{
 						data: Data{
 							Type:   STRING,
 							String: string(valBytes),

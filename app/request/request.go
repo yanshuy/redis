@@ -219,6 +219,9 @@ func (c *Client) HandleCmd(cmd string, args []resp.Data) resp.Data {
 	case "publish":
 		return HandlePublish(args)
 
+	case "incr":
+		return HandleCmdIncr(args)
+
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd)
 		return Err(msg)
