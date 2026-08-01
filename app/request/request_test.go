@@ -14,13 +14,15 @@ import (
 )
 
 type rw struct {
-	r *bytes.Reader
-	w bytes.Buffer
+	r      *bytes.Reader
+	w      bytes.Buffer
+	closed bool
 }
 
 func newRW(in string) *rw                  { return &rw{r: bytes.NewReader([]byte(in))} }
 func (rw *rw) Read(p []byte) (int, error)  { return rw.r.Read(p) }
 func (rw *rw) Write(p []byte) (int, error) { return rw.w.Write(p) }
+func (rw *rw) Close() error                { rw.closed = true; return nil }
 func (rw *rw) Output() string              { return rw.w.String() }
 
 func TestRequest_PING(t *testing.T) {

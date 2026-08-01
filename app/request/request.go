@@ -11,23 +11,43 @@ import (
 )
 
 type Client struct {
-	conn          io.Writer
+	conn          io.WriteCloser
 	subscriptions map[string]chan string
+	authAsUser    *User
 	done          chan struct{}
+	quit          bool
 }
 
 func (c *Client) inSubscribeMode() bool {
 	return len(c.subscriptions) > 0
 }
 
-func NewClient(conn io.Writer) *Client {
+func (c *Client) Close() error {
+	for channel := range c.subscriptions {
+		Chans.unsubscribe(channel, c)
+	}
+	return c.conn.Close()
+}
+
+func (c *Client) isAuthenticated() bool {
+	return c.authAsUser != nil
+}
+
+func NewClient(conn io.WriteCloser) *Client {
+	var user *User
+	if DefaultUser.flags.Contains("nopass") {
+		user = DefaultUser
+	}
+	doneChan := make(chan struct{})
+
 	return &Client{
-		conn: conn,
-		done: make(chan struct{}),
+		conn:       conn,
+		authAsUser: user,
+		done:       doneChan,
 	}
 }
 
-func ReadAndHandleRequest(conn io.ReadWriter) (n int, err error) {
+func ReadAndHandleRequest(conn io.ReadWriteCloser) (n int, err error) {
 	c := NewClient(conn)
 	// TODO: request > 1024
 	b := make([]byte, 1024)
@@ -45,7 +65,7 @@ func ReadAndHandleRequest(conn io.ReadWriter) (n int, err error) {
 				if err != nil {
 					return bLen, err
 				}
-				copy(b, b[o:n])
+				copy(b, b[o:bLen])
 				bLen -= o
 			}
 		}
@@ -61,49 +81,60 @@ func ReadAndHandleRequest(conn io.ReadWriter) (n int, err error) {
 	return bLen, nil
 }
 
-func (c *Client) HandleRequest(w io.Writer, rs []resp.Data) (err error) {
-	for _, r := range rs {
-		var res resp.Data
-		switch r.Type {
-		case resp.Array:
-			if len(r.Arr) == 0 {
-				res = Err("invalid command")
-				break
-			}
-			f := r.Arr[0]
-			if f.Str == "" {
-				res = Err("invalid command")
-				break
-			}
-			res = c.HandleCmd(f.Str, r.Arr[1:])
-		case resp.String, resp.BulkString:
-			res = c.HandleCmd(r.Str, nil)
-		default:
-			res = Err("invalid command")
-		}
-
+func (c *Client) HandleRequest(w io.Writer, requests []resp.Data) (err error) {
+	for _, req := range requests {
+		res := c.execute(req)
 		resBytes := res.ToResponse()
-		_, err := w.Write(resBytes)
-		if err != nil {
+		if _, err := w.Write(resBytes); err != nil {
 			return err
+		}
+		if c.quit {
+			return c.Close()
+		}
+	}
+	return nil
+}
+
+func (c *Client) execute(req resp.Data) resp.Data {
+	var cmd string
+	var args []resp.Data
+
+	switch req.Type {
+	case resp.Array:
+		if len(req.Arr) == 0 {
+			return Err("empty command")
+		}
+		first := req.Arr[0]
+		if first.Type != resp.BulkString && first.Type != resp.String {
+			return Err("invalid command")
+		}
+		cmd = first.Str
+		args = req.Arr[1:]
+
+	case resp.String, resp.BulkString:
+		cmd = req.Str
+	default:
+		return Err("invalid command")
+	}
+
+	cmd = strings.ToLower(cmd)
+	if !c.isAuthenticated() {
+		switch cmd {
+		case "auth", "hello", "ping":
+		default:
+			return NoAuth()
 		}
 	}
 
-	return err
+	return c.HandleCmd(cmd, args)
 }
 
 func (c *Client) HandleCmd(cmd string, args []resp.Data) resp.Data {
-	cmd = strings.ToLower(cmd)
-
 	if c.inSubscribeMode() {
 		switch cmd {
 		case "ping":
 			return resp.NewData(resp.Array, "pong", "")
-		case "subscribe":
-			return HandleSubscribe(c, args)
-		case "unsubscribe":
-			return HandleUnsubscribe(c, args)
-		case "quit":
+		case "subscribe", "unsubscribe", "quit":
 		default:
 			return Err(fmt.Sprintf("Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", cmd))
 		}
@@ -112,6 +143,10 @@ func (c *Client) HandleCmd(cmd string, args []resp.Data) resp.Data {
 	switch cmd {
 	case "ping":
 		return resp.NewData(resp.String, "PONG")
+
+	case "quit":
+		c.quit = true
+		return resp.NewData(resp.String, "OK")
 
 	case "echo":
 		if len(args) != 1 {
@@ -178,6 +213,9 @@ func (c *Client) HandleCmd(cmd string, args []resp.Data) resp.Data {
 	case "subscribe":
 		return HandleSubscribe(c, args)
 
+	case "unsubscribe":
+		return HandleUnsubscribe(c, args)
+
 	case "publish":
 		return HandlePublish(args)
 
@@ -203,8 +241,4 @@ func NoAuth() resp.Data {
 
 func WrongArgs(cmd string) resp.Data {
 	return Err("wrong number of arguments for '" + cmd + "' command")
-}
-
-func ErrWrongArgs(cmd string) resp.Data {
-	return WrongArgs(cmd)
 }

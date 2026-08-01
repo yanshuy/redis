@@ -327,11 +327,12 @@ func (c *Channels) subscribe(channel string, client *Client) {
 	}
 	cn := make(chan string, 1)
 	client.subscriptions[channel] = cn
+
 	c.mu.Lock()
 	c.Channels[channel] = append(c.Channels[channel], client)
 	c.mu.Unlock()
 
-	go func(channel string, cn chan string) {
+	go func() {
 		for {
 			select {
 			case msg, ok := <-cn:
@@ -344,32 +345,37 @@ func (c *Channels) subscribe(channel string, client *Client) {
 				return
 			}
 		}
-	}(channel, cn)
+	}()
 }
 
 func (c *Channels) unsubscribe(channel string, client *Client) {
 	ch, ok := client.subscriptions[channel]
-	if ok {
-		c.mu.Lock()
-		subs := c.Channels[channel]
-		for i, c := range subs {
-			if c == client {
-				subs = append(subs[:i], subs[i+1:]...)
-				break
-			}
-		}
-		if len(subs) == 0 {
-			delete(c.Channels, channel)
-		} else {
-			c.Channels[channel] = subs
-		}
-		c.mu.Unlock()
+	if !ok {
+		return
+	}
 
-		close(ch)
-		delete(client.subscriptions, channel)
-		if len(client.subscriptions) == 0 {
-			client.done <- struct{}{}
+	c.mu.Lock()
+
+	subs := c.Channels[channel]
+	for i, c := range subs {
+		if c == client {
+			subs = append(subs[:i], subs[i+1:]...)
+			break
 		}
+	}
+	if len(subs) == 0 {
+		delete(c.Channels, channel)
+	} else {
+		c.Channels[channel] = subs
+	}
+
+	c.mu.Unlock()
+
+	close(ch)
+	delete(client.subscriptions, channel)
+
+	if len(client.subscriptions) == 0 {
+		client.done <- struct{}{}
 	}
 }
 

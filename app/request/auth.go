@@ -29,12 +29,14 @@ func (u *User) ToRESP() resp.Data {
 	return resp.NewData(resp.Array, res)
 }
 
+var DefaultUser = &User{
+	name:      "default",
+	flags:     NewSet[string]("nopass"),
+	passwords: Set[[32]byte]{},
+}
+
 var users = map[string]*User{
-	"default": {
-		name:      "default",
-		flags:     NewSet[string]("nopass"),
-		passwords: Set[[32]byte]{},
-	},
+	"default": DefaultUser,
 }
 
 var currentUser = "default"
