@@ -460,7 +460,8 @@ func HandleCmdIncr(args []resp.Data) resp.Data {
 			panic("unhandles situation")
 		}
 	} else {
-		return resp.NewData(resp.BulkString, "-1")
+		store.RDB.Set(key, "1", 0)
+		return resp.NewData(resp.Integer, 1)
 	}
 }
 
