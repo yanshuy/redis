@@ -457,7 +457,7 @@ func HandleCmdIncr(args []resp.Data) resp.Data {
 			store.RDB.Set(key, strconv.Itoa(i), entry.ExpiryAt)
 			return resp.NewData(resp.Integer, int64(i))
 		} else {
-			panic("unhandles situation")
+			return Err("value is not an integer or out of range")
 		}
 	} else {
 		store.RDB.Set(key, "1", 0)
