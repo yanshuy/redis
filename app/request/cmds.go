@@ -486,7 +486,7 @@ func HandleCmdACL(args []resp.Data) resp.Data {
 	}
 }
 
-func HandleCmdAuth(args []resp.Data) resp.Data {
+func HandleCmdAuth(c *Client, args []resp.Data) resp.Data {
 	if len(args) != 2 {
 		return WrongArgs("auth")
 	}
@@ -499,5 +499,5 @@ func HandleCmdAuth(args []resp.Data) resp.Data {
 		return Err("password must be a bulk string")
 	}
 
-	return Authenticate(args[0].Str, args[1].Str)
+	return Authenticate(c, args[0].Str, args[1].Str)
 }

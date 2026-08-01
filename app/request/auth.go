@@ -68,11 +68,12 @@ func ACL_SETUSER(username string, rule string) resp.Data {
 	}
 }
 
-func Authenticate(username string, password string) resp.Data {
+func Authenticate(c *Client, username string, password string) resp.Data {
 	if user, ok := users[username]; ok {
 		calc := sha256.Sum256([]byte(password))
 
 		if user.passwords.Contains(calc) {
+			c.authAsUser = user
 			return resp.NewData(resp.String, "OK")
 		}
 		return WrongPass()

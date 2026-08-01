@@ -164,7 +164,7 @@ func (c *Client) HandleCmd(cmd string, args []resp.Data) resp.Data {
 		return HandleCmdACL(args)
 
 	case "auth":
-		return HandleCmdAuth(args)
+		return HandleCmdAuth(c, args)
 
 	case "rpush":
 		return HandleRpush(args)
