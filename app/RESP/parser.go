@@ -10,7 +10,7 @@ var CRLF = []byte("\r\n")
 
 // returns (value, consumedBytes, error).
 // If data is incomplete, returns (zeroValue, 0, nil).
-func Parse(b []byte) (r []DataType, n int, err error) {
+func Parse(b []byte) (r []Data, n int, err error) {
 	if len(b) == 0 {
 		return r, 0, nil
 	}
@@ -27,7 +27,7 @@ func Parse(b []byte) (r []DataType, n int, err error) {
 	return r, n, nil
 }
 
-func R(b []byte) (d DataType, n int, err error) {
+func R(b []byte) (d Data, n int, err error) {
 	i := bytes.Index(b, CRLF)
 	if i == -1 {
 		return d, 0, errors.New("No CRLF terminator")
@@ -51,7 +51,7 @@ func R(b []byte) (d DataType, n int, err error) {
 
 	case Array:
 		l, _ := strconv.Atoi(string(b[1:i]))
-		d.Arr = make([]DataType, 0, l)
+		d.Arr = make([]Data, 0, l)
 
 		for range l {
 			v, o, err := R(b[next:])

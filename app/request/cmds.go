@@ -10,7 +10,7 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
-func HandleCmdGet(args []resp.DataType) resp.DataType {
+func HandleCmdGet(args []resp.Data) resp.Data {
 	if len(args) != 1 {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'get' command")
 	}
@@ -25,7 +25,7 @@ func HandleCmdGet(args []resp.DataType) resp.DataType {
 	}
 }
 
-func HandleCmdSet(args []resp.DataType) resp.DataType {
+func HandleCmdSet(args []resp.Data) resp.Data {
 	if len(args) < 2 {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'set' command")
 	}
@@ -58,7 +58,7 @@ func HandleCmdSet(args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.String, "OK")
 }
 
-func HandleRpush(args []resp.DataType) resp.DataType {
+func HandleRpush(args []resp.Data) resp.Data {
 	if len(args) < 2 {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'rpush' command")
 	}
@@ -81,7 +81,7 @@ func HandleRpush(args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.Integer, int64(l))
 }
 
-func HandleLpush(args []resp.DataType) resp.DataType {
+func HandleLpush(args []resp.Data) resp.Data {
 	if len(args) < 2 {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'lpush' command")
 	}
@@ -104,7 +104,7 @@ func HandleLpush(args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.Integer, int64(l))
 }
 
-func HandleLpop(args []resp.DataType) resp.DataType {
+func HandleLpop(args []resp.Data) resp.Data {
 	if len(args) < 1 || len(args) > 2 {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'lpop' command")
 	}
@@ -134,7 +134,7 @@ func HandleLpop(args []resp.DataType) resp.DataType {
 	}
 }
 
-func HandleLlen(args []resp.DataType) resp.DataType {
+func HandleLlen(args []resp.Data) resp.Data {
 	if len(args) != 1 {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'llen' command")
 	}
@@ -149,7 +149,7 @@ func HandleLlen(args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.Integer, int64(l))
 }
 
-func HandleLrange(args []resp.DataType) resp.DataType {
+func HandleLrange(args []resp.Data) resp.Data {
 	if len(args) != 3 {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'lrange' command")
 	}
@@ -172,7 +172,7 @@ func HandleLrange(args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.Array, elems)
 }
 
-func HandleBlpop(args []resp.DataType) resp.DataType {
+func HandleBlpop(args []resp.Data) resp.Data {
 	if len(args) != 2 {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'blpop' command")
 	}
@@ -196,7 +196,7 @@ func HandleBlpop(args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.Array, []string{key, s})
 }
 
-func HandleType(args []resp.DataType) resp.DataType {
+func HandleType(args []resp.Data) resp.Data {
 	if len(args) != 1 {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'blpop' command")
 	}
@@ -208,7 +208,7 @@ func HandleType(args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.String, t)
 }
 
-func HandleXadd(args []resp.DataType) resp.DataType {
+func HandleXadd(args []resp.Data) resp.Data {
 	if len(args) < 2 {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'xadd' command")
 	}
@@ -240,7 +240,7 @@ func HandleXadd(args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.BulkString, s)
 }
 
-func HandleXrange(args []resp.DataType) resp.DataType {
+func HandleXrange(args []resp.Data) resp.Data {
 	if len(args) != 3 {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'xadd' command")
 	}
@@ -268,11 +268,11 @@ func HandleXrange(args []resp.DataType) resp.DataType {
 	return res
 }
 
-func HandleXread(args []resp.DataType) resp.DataType {
+func HandleXread(args []resp.Data) resp.Data {
 	return resp.NewData(resp.Array)
 }
 
-func HandleConfig(args []resp.DataType) resp.DataType {
+func HandleConfig(args []resp.Data) resp.Data {
 	if len(args) < 2 {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'config' command")
 	}
@@ -294,7 +294,7 @@ func HandleConfig(args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.Array, nil)
 }
 
-func HandleKeys(args []resp.DataType) resp.DataType {
+func HandleKeys(args []resp.Data) resp.Data {
 	if len(args) != 1 {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'config' command")
 	}
@@ -387,7 +387,7 @@ var Chans = Channels{
 	Channels: make(map[string][]*Client),
 }
 
-func HandleSubscribe(c *Client, args []resp.DataType) resp.DataType {
+func HandleSubscribe(c *Client, args []resp.Data) resp.Data {
 	if len(args) != 1 {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'config' command")
 	}
@@ -405,7 +405,7 @@ func HandleSubscribe(c *Client, args []resp.DataType) resp.DataType {
 	)
 }
 
-func HandlePublish(args []resp.DataType) resp.DataType {
+func HandlePublish(args []resp.Data) resp.Data {
 	if len(args) != 2 {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'config' command")
 	}
@@ -422,7 +422,7 @@ func HandlePublish(args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.Integer, int64(n))
 }
 
-func HandleUnsubscribe(c *Client, args []resp.DataType) resp.DataType {
+func HandleUnsubscribe(c *Client, args []resp.Data) resp.Data {
 	if len(args) != 1 {
 		return resp.NewData(resp.Error, "wrong number of arguments for 'config' command")
 	}
@@ -434,40 +434,72 @@ func HandleUnsubscribe(c *Client, args []resp.DataType) resp.DataType {
 	return resp.NewData(resp.Array, "unsubscribe", channel, int64(len(c.subscriptions)))
 }
 
-func HandleCmdACL(args []resp.DataType) resp.DataType {
-	if len(args) >= 1 {
-		sub := strings.ToLower(args[0].Str)
-		switch sub {
-		case "whoami":
-			return ACL_WHOAMI()
-		case "getuser":
-			if len(args) >= 2 {
-				username := args[1]
-				if username.Type != resp.BulkString {
-					return resp.NewData(resp.BulkString, "-1")
-				}
-				return ACL_GETUSER(username.Str)
-			} else {
-				panic("getusername : got no user name")
-			}
-		case "setuser":
-			if len(args) >= 3 {
-				username := args[1]
-				if username.Type != resp.BulkString {
-					return resp.NewData(resp.BulkString, "-1")
-				}
-				rule := args[2]
-				if username.Type != resp.BulkString {
-					return resp.NewData(resp.BulkString, "-1")
-				}
-				return ACL_SETUSER(username.Str, rule.Str)
-			} else {
-				panic("setusername : less than expected arguments")
-			}
-		default:
-			panic("situation not handled here")
-		}
-	} else {
-		panic("got 'ACL' expected 'ACL SUBCOMMAND'")
+func HandleCmdACL(args []resp.Data) resp.Data {
+	if len(args) == 0 {
+		return resp.NewData(resp.Error,
+			"ERR wrong number of arguments for 'acl' command")
 	}
+
+	switch strings.ToLower(args[0].Str) {
+	case "whoami":
+		if len(args) != 1 {
+			return resp.NewData(resp.Error,
+				"ERR wrong number of arguments for 'acl|whoami' command")
+		}
+		return ACL_WHOAMI()
+
+	case "getuser":
+		if len(args) != 2 {
+			return resp.NewData(resp.Error,
+				"ERR wrong number of arguments for 'acl|getuser' command")
+		}
+
+		if args[1].Type != resp.BulkString {
+			return resp.NewData(resp.Error,
+				"ERR username must be a bulk string")
+		}
+
+		return ACL_GETUSER(args[1].Str)
+
+	case "setuser":
+		if len(args) != 3 {
+			return resp.NewData(resp.Error,
+				"ERR wrong number of arguments for 'acl|setuser' command")
+		}
+
+		if args[1].Type != resp.BulkString {
+			return resp.NewData(resp.Error,
+				"ERR username must be a bulk string")
+		}
+
+		if args[2].Type != resp.BulkString {
+			return resp.NewData(resp.Error,
+				"ERR rule must be a bulk string")
+		}
+
+		return ACL_SETUSER(args[1].Str, args[2].Str)
+
+	default:
+		return resp.NewData(resp.Error,
+			"ERR unknown subcommand '"+args[0].Str+"'")
+	}
+}
+
+func HandleCmdAuth(args []resp.Data) resp.Data {
+	if len(args) != 2 {
+		return resp.NewData(resp.Error,
+			"ERR wrong number of arguments for 'auth' command")
+	}
+
+	if args[0].Type != resp.BulkString {
+		return resp.NewData(resp.Error,
+			"ERR username must be a bulk string")
+	}
+
+	if args[1].Type != resp.BulkString {
+		return resp.NewData(resp.Error,
+			"ERR password must be a bulk string")
+	}
+
+	return Authenticate(args[0].Str, args[1].Str)
 }

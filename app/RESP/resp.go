@@ -15,19 +15,19 @@ const (
 	Array      byte = '*'
 )
 
-type DataType struct {
+type Data struct {
 	Type byte
 	Str  string
 	Int  int64
-	Arr  []DataType
+	Arr  []Data
 }
 
-func (d *DataType) Is(dataType byte) bool {
+func (d *Data) Is(dataType byte) bool {
 	return d.Type == dataType
 }
 
-func NewData(t byte, data ...any) DataType {
-	d := DataType{Type: t}
+func NewData(t byte, data ...any) Data {
+	d := Data{Type: t}
 	if data == nil {
 		return d
 	}
@@ -45,16 +45,16 @@ func NewData(t byte, data ...any) DataType {
 	case Array:
 		for _, datum := range data {
 			switch v := datum.(type) {
-			case []DataType:
+			case []Data:
 				d.Arr = v
-			case DataType:
+			case Data:
 				d.Arr = append(d.Arr, v)
 			case string:
 				s := NewData(BulkString, v)
 				d.Arr = append(d.Arr, s)
 			case []string:
 				if len(v) == 0 {
-					d.Arr = []DataType{}
+					d.Arr = []Data{}
 					return d
 				}
 				for _, elem := range v {
@@ -78,7 +78,7 @@ func NewData(t byte, data ...any) DataType {
 	}
 }
 
-func (d *DataType) String() string {
+func (d *Data) String() string {
 	switch d.Type {
 	case Error:
 		return d.Str
@@ -97,7 +97,7 @@ func (d *DataType) String() string {
 	}
 }
 
-func (d *DataType) Integer() (int64, error) {
+func (d *Data) Integer() (int64, error) {
 	switch d.Type {
 	case String, BulkString:
 		i, err := strconv.ParseInt(d.Str, 10, 64)
@@ -112,7 +112,7 @@ func (d *DataType) Integer() (int64, error) {
 	}
 }
 
-func (d *DataType) ToResponse() []byte {
+func (d *Data) ToResponse() []byte {
 	crlf := "\r\n"
 	switch d.Type {
 	case Error:

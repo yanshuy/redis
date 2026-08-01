@@ -61,9 +61,9 @@ func ReadAndHandleRequest(conn io.ReadWriter) (n int, err error) {
 	return bLen, nil
 }
 
-func (c *Client) HandleRequest(w io.Writer, rs []resp.DataType) (err error) {
+func (c *Client) HandleRequest(w io.Writer, rs []resp.Data) (err error) {
 	for _, r := range rs {
-		var res resp.DataType
+		var res resp.Data
 		f := r.Arr[0]
 		switch r.Type {
 		case resp.Array:
@@ -88,7 +88,7 @@ func (c *Client) HandleRequest(w io.Writer, rs []resp.DataType) (err error) {
 	return err
 }
 
-func (c *Client) HandleCmd(cmd string, args []resp.DataType) resp.DataType {
+func (c *Client) HandleCmd(cmd string, args []resp.Data) resp.Data {
 	cmd = strings.ToLower(cmd)
 
 	if c.inSubscribeMode() {
@@ -122,6 +122,9 @@ func (c *Client) HandleCmd(cmd string, args []resp.DataType) resp.DataType {
 		return HandleCmdSet(args)
 
 	case "acl":
+		return HandleCmdACL(args)
+
+	case "auth":
 		return HandleCmdACL(args)
 
 	case "rpush":
