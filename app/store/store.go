@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -110,9 +111,8 @@ func (rs *RedisStore) Keys(pattern string) []string {
 
 func (rs *RedisStore) TouchWatchedKey(key string) {
 	for _, c := range rs.WatchedKeys[key] {
-		if c.InWatch() {
-			c.CASDirty = true
-		}
+		fmt.Println("dirtying", c)
+		c.CASDirty = true
 	}
 }
 
