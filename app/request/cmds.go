@@ -464,6 +464,9 @@ func HandleDiscard(c *client.Client) resp.Data {
 }
 
 func HandleWatch(c *client.Client, args []resp.Data) resp.Data {
+	if !c.InMulti {
+		return resp.Err("WATCH inside MULTI is not allowed")
+	}
 	if len(args) != 1 {
 		return resp.WrongArgs("watch")
 	}
