@@ -14,6 +14,8 @@ type Client struct {
 	conn          io.WriteCloser
 	subscriptions map[string]chan string
 	authAsUser    *User
+	inMulti       bool
+	queuedCmds    []Command
 	done          chan struct{}
 	quit          bool
 }
@@ -61,7 +63,7 @@ func ReadAndHandleRequest(conn io.ReadWriteCloser) (n int, err error) {
 				return bLen, err
 			}
 			if o > 0 {
-				err := c.HandleRequest(conn, r)
+				err := c.HandleRequests(conn, r)
 				if err != nil {
 					return bLen, err
 				}
@@ -81,9 +83,10 @@ func ReadAndHandleRequest(conn io.ReadWriteCloser) (n int, err error) {
 	return bLen, nil
 }
 
-func (c *Client) HandleRequest(w io.Writer, requests []resp.Data) (err error) {
+func (c *Client) HandleRequests(w io.Writer, requests []resp.Data) (err error) {
 	for _, req := range requests {
 		res := c.execute(req)
+
 		resBytes := res.ToResponse()
 		if _, err := w.Write(resBytes); err != nil {
 			return err
@@ -95,9 +98,13 @@ func (c *Client) HandleRequest(w io.Writer, requests []resp.Data) (err error) {
 	return nil
 }
 
+type Command struct {
+	name string
+	args []resp.Data
+}
+
 func (c *Client) execute(req resp.Data) resp.Data {
-	var cmd string
-	var args []resp.Data
+	cmd := Command{}
 
 	switch req.Type {
 	case resp.Array:
@@ -108,39 +115,45 @@ func (c *Client) execute(req resp.Data) resp.Data {
 		if first.Type != resp.BulkString && first.Type != resp.String {
 			return Err("invalid command")
 		}
-		cmd = first.Str
-		args = req.Arr[1:]
+		cmd.name = strings.ToLower(first.Str)
+		cmd.args = req.Arr[1:]
 
 	case resp.String, resp.BulkString:
-		cmd = req.Str
+		cmd.name = req.Str
 	default:
 		return Err("invalid command")
 	}
 
-	cmd = strings.ToLower(cmd)
 	if !c.isAuthenticated() {
-		switch cmd {
+		switch cmd.name {
 		case "auth", "hello", "ping":
 		default:
 			return NoAuth()
 		}
 	}
 
-	return c.HandleCmd(cmd, args)
+	return c.HandleCmd(cmd)
 }
 
-func (c *Client) HandleCmd(cmd string, args []resp.Data) resp.Data {
+func (c *Client) HandleCmd(cmd Command) resp.Data {
+	args := cmd.args
+
 	if c.inSubscribeMode() {
-		switch cmd {
+		switch cmd.name {
 		case "ping":
 			return resp.NewData(resp.Array, "pong", "")
 		case "subscribe", "unsubscribe", "quit":
 		default:
-			return Err(fmt.Sprintf("Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", cmd))
+			return Err(fmt.Sprintf("Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", cmd.name))
 		}
 	}
 
-	switch cmd {
+	if c.inMulti {
+		c.queuedCmds = append(c.queuedCmds, cmd)
+		return resp.NewData(resp.String, "QUEUED")
+	}
+
+	switch cmd.name {
 	case "ping":
 		return resp.NewData(resp.String, "PONG")
 
@@ -222,8 +235,25 @@ func (c *Client) HandleCmd(cmd string, args []resp.Data) resp.Data {
 	case "incr":
 		return HandleCmdIncr(args)
 
+	case "multi":
+		c.inMulti = true
+		return resp.NewData(resp.String, "OK")
+
+	case "exec":
+		if c.inMulti {
+			c.inMulti = false
+		} else {
+			return Err("EXEC without MULTI")
+		}
+		respArr := make([]resp.Data, len(c.queuedCmds))
+		for _, cmd := range c.queuedCmds {
+			resp := c.HandleCmd(cmd)
+			respArr = append(respArr, resp)
+		}
+		return resp.NewData(resp.Array, respArr)
+
 	default:
-		msg := fmt.Sprintf("unknown command `%s`", cmd)
+		msg := fmt.Sprintf("unknown command `%s`", cmd.name)
 		return Err(msg)
 	}
 }
