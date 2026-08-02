@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -48,10 +49,10 @@ func NewData(t byte, data ...any) Data {
 				return d
 			}
 			switch v := datum.(type) {
-			case []Data:
-				d.Arr = v
 			case Data:
 				d.Arr = append(d.Arr, v)
+			case []Data:
+				d.Arr = v
 			case string:
 				s := NewData(BulkString, v)
 				d.Arr = append(d.Arr, s)
@@ -60,12 +61,16 @@ func NewData(t byte, data ...any) Data {
 					d.Arr = []Data{}
 					return d
 				}
+				d.Arr = make([]Data, len(v))
 				for _, elem := range v {
 					s := NewData(BulkString, elem)
 					d.Arr = append(d.Arr, s)
 				}
 			case int64:
 				s := NewData(Integer, v)
+				d.Arr = append(d.Arr, s)
+			case int:
+				s := NewData(Integer, int64(v))
 				d.Arr = append(d.Arr, s)
 			default:
 				panic("unhandled case")
@@ -92,11 +97,11 @@ func (d *Data) String() string {
 	case Integer:
 		return strconv.Itoa(int(d.Int))
 	case Array:
-		str := ""
+		var str strings.Builder
 		for _, sd := range d.Arr {
-			str += sd.String()
+			str.WriteString(sd.String())
 		}
-		return str
+		return str.String()
 	default:
 		return ""
 	}
