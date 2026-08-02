@@ -11,8 +11,8 @@ type Z struct {
 }
 
 type znode struct {
-	value Z
-	next  *znode
+	Z
+	next *znode
 }
 
 type skiplist struct {
@@ -39,18 +39,26 @@ func insert(s Zset, z Z) Zset {
 	s.dict[z.member] = z
 
 	if s.list.head == nil {
-		s.list.head = &znode{value: z}
+		s.list.head = &znode{Z: z}
+		return s
+	}
+	if z.score < s.list.head.score {
+		s.list.head = &znode{
+			Z:    z,
+			next: s.list.head,
+		}
 		return s
 	}
 	cur := s.list.head
-	for cur != nil && cur.value.score < z.score {
+	for cur.next != nil && cur.next.score < z.score {
 		cur = cur.next
 	}
 
-	cur.next = &znode{
-		value: z,
-		next:  cur.next,
+	node := &znode{
+		Z:    z,
+		next: cur.next,
 	}
+	cur.next = node
 	return s
 }
 

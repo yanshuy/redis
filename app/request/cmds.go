@@ -218,7 +218,6 @@ func HandleZadd(args []resp.Data) resp.Data {
 	if err != nil {
 		return resp.Err(err.Error())
 	}
-	fmt.Println("dfae")
 	return resp.NewData(resp.Integer, l)
 }
 
