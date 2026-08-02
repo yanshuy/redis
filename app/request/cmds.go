@@ -443,13 +443,16 @@ func HandleExec(c *client.Client) resp.Data {
 	} else {
 		return resp.Err("EXEC without MULTI")
 	}
-	if c.CASDirty {
-		c.CASDirty = false
+
+	dirty := c.CASDirty
+	c.CASDirty = false
+	queued := c.QueuedCmds
+	c.QueuedCmds = nil
+
+	if dirty {
 		return resp.NewData(resp.Array)
 	}
 
-	queued := c.QueuedCmds
-	c.QueuedCmds = nil
 	respArr := make([]resp.Data, 0, len(queued))
 	for _, cmd := range queued {
 		res := HandleCmd(c, Command{cmd.Name, cmd.Args})
