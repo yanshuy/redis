@@ -83,5 +83,5 @@ func (rs *RedisStore) Zadd(key string, score_member []string) (s int, err error)
 	}
 
 	rs.TouchWatchedKey(key)
-	return m.data.Zset.len(), nil
+	return len(score_member) / 2, nil
 }
