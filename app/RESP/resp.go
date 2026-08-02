@@ -41,7 +41,14 @@ func NewData(t byte, data ...any) Data {
 		d.Str = datum.(string)
 		return d
 	case Integer:
-		d.Int = datum.(int64)
+		switch v := datum.(type) {
+		case int64:
+			d.Int = v
+		case int:
+			d.Int = int64(v)
+		default:
+			panic("expecteed int got something else")
+		}
 		return d
 	case Array:
 		for _, datum := range data {

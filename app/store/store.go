@@ -10,20 +10,23 @@ import (
 
 type Value struct {
 	ExpiryAt int64
-	data     Data
+	data     Obj
 }
 
-func (rs *RedisStore) NewStoreMember(key string, t DataType) *Value {
+func (rs *RedisStore) NewStoreMember(key string, t ObjType) *Value {
 	m := &Value{
-		data: Data{Type: t},
+		data: Obj{Type: t},
+	}
+	if t == ZSET {
+		m.data.Zset = NewZset()
 	}
 	rs.Store[key] = m
 	return m
 }
 
 type RedisStore struct {
-	Store       map[string]*Value
 	Config      map[string]string
+	Store       map[string]*Value
 	Listeners   map[string][]chan struct{}
 	WatchedKeys map[string][]*client.Client
 	mu          sync.Mutex
@@ -42,22 +45,40 @@ var RDB RedisStore = RedisStore{
 	mu:          sync.Mutex{},
 }
 
-type DataType int
+type ObjType int
 
 const (
-	STRING DataType = iota
+	STRING ObjType = iota
 	LIST
 	STREAM
+	ZSET
 )
 
-type Data struct {
-	Type   DataType
+type Obj struct {
+	Type   ObjType
 	String string
-	Stream *StreamObj
+	Stream *Stream
 	List   []string
+	Zset   Zset
 }
 
-func (rs *RedisStore) RemoveValueAfter(ttl_ms int64, key string) {
+func (rs *RedisStore) Type(key string) string {
+	if m, ok := rs.Look(key); ok {
+		switch m.data.Type {
+		case STRING:
+			return "string"
+		case LIST:
+			return "list"
+		case STREAM:
+			return "stream"
+		case ZSET:
+			return "zset"
+		}
+	}
+	return "none"
+}
+
+func (rs *RedisStore) RemoveMemberAfter(ttl_ms int64, key string) {
 	timer := time.NewTimer(time.Duration(ttl_ms) * time.Millisecond)
 	<-timer.C
 	delete(rs.Store, key)
@@ -68,7 +89,7 @@ func (rs *RedisStore) Set(key string, val string, ttl_ms int64) {
 	mem.data.String = val
 	if ttl_ms > 0 {
 		mem.ExpiryAt = time.Now().UnixMilli() + ttl_ms
-		go rs.RemoveValueAfter(ttl_ms, key)
+		go rs.RemoveMemberAfter(ttl_ms, key)
 	}
 	rs.TouchWatchedKey(key)
 }
@@ -112,20 +133,6 @@ func (rs *RedisStore) TouchWatchedKey(key string) {
 	for _, c := range rs.WatchedKeys[key] {
 		c.CASDirty = true
 	}
-}
-
-func (rs *RedisStore) Type(key string) string {
-	if m, ok := rs.Look(key); ok {
-		switch m.data.Type {
-		case STRING:
-			return "string"
-		case LIST:
-			return "list"
-		case STREAM:
-			return "stream"
-		}
-	}
-	return "none"
 }
 
 func (rs *RedisStore) subscribe(key string) chan struct{} {

@@ -18,7 +18,7 @@ type StreamEntry struct {
 	Fields []string
 }
 
-type StreamObj struct {
+type Stream struct {
 	LastID  StreamID
 	Entries []StreamEntry
 }
@@ -61,7 +61,7 @@ func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (s string,
 	streamId := StreamID{time_ms, seqNo}
 	if !exists {
 		m := rs.NewStoreMember(key, STREAM)
-		s := &StreamObj{
+		s := &Stream{
 			LastID:  streamId,
 			Entries: []StreamEntry{{streamId, key_vals}},
 		}

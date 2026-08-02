@@ -78,7 +78,7 @@ func HandleRpush(args []resp.Data) resp.Data {
 	if err != nil {
 		return resp.Err(err.Error())
 	}
-	return resp.NewData(resp.Integer, int64(l))
+	return resp.NewData(resp.Integer, l)
 }
 
 func HandleLpush(args []resp.Data) resp.Data {
@@ -101,7 +101,7 @@ func HandleLpush(args []resp.Data) resp.Data {
 	if err != nil {
 		return resp.Err(err.Error())
 	}
-	return resp.NewData(resp.Integer, int64(l))
+	return resp.NewData(resp.Integer, l)
 }
 
 func HandleLpop(args []resp.Data) resp.Data {
@@ -146,7 +146,7 @@ func HandleLlen(args []resp.Data) resp.Data {
 	if err != nil {
 		return resp.Err(err.Error())
 	}
-	return resp.NewData(resp.Integer, int64(l))
+	return resp.NewData(resp.Integer, l)
 }
 
 func HandleLrange(args []resp.Data) resp.Data {
@@ -194,6 +194,32 @@ func HandleBlpop(args []resp.Data) resp.Data {
 		return resp.NewData(resp.Array)
 	}
 	return resp.NewData(resp.Array, []string{key, s})
+}
+
+func HandleZadd(args []resp.Data) resp.Data {
+	if len(args) <= 1 {
+		return resp.WrongArgs("ZADD")
+	}
+
+	if !args[0].Is(resp.BulkString) {
+		return resp.Err("key must be a bulk string")
+	}
+	key := args[0].Str
+
+	strArgs := make([]string, 0, len(args)-1)
+	for _, arg := range args[1:] {
+		if arg.Is(resp.BulkString) {
+			strArgs = append(strArgs, arg.Str)
+		} else {
+			return resp.Err("invalid argument type for 'ZADD' command expects bulk string")
+		}
+	}
+	l, err := store.RDB.Zadd(key, strArgs)
+	if err != nil {
+		return resp.Err(err.Error())
+	}
+	fmt.Println("dfae")
+	return resp.NewData(resp.Integer, l)
 }
 
 func HandleType(args []resp.Data) resp.Data {
@@ -341,7 +367,7 @@ func HandlePublish(args []resp.Data) resp.Data {
 	}
 
 	n := client.Chans.Publish(channel, message)
-	return resp.NewData(resp.Integer, int64(n))
+	return resp.NewData(resp.Integer, n)
 }
 
 func HandleUnsubscribe(c *client.Client, args []resp.Data) resp.Data {
@@ -374,7 +400,7 @@ func HandleCmdIncr(args []resp.Data) resp.Data {
 		}
 	} else {
 		store.RDB.Set(key, "1", 0)
-		return resp.NewData(resp.Integer, int64(1))
+		return resp.NewData(resp.Integer, 1)
 	}
 }
 

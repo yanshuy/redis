@@ -360,7 +360,7 @@ func (rs *RedisStore) RestoreRDBSnapshot() (err error) {
 					i += vLen
 
 					rs.Store[string(keyBytes)] = &Value{
-						data: Data{
+						data: Obj{
 							Type:   STRING,
 							String: string(valBytes),
 						},

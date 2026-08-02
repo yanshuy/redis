@@ -167,6 +167,9 @@ func HandleCmd(c *client.Client, cmd Command) resp.Data {
 	case "blpop":
 		return HandleBlpop(args)
 
+	case "zadd":
+		return HandleZadd(args)
+
 	case "type":
 		return HandleType(args)
 
