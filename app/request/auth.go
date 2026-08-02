@@ -16,7 +16,9 @@ type User struct {
 
 func (u *User) ToRESP() resp.Data {
 	flags := resp.NewData(resp.BulkString, "flags")
+	fmt.Println("sc1")
 	flags_v := resp.NewData(resp.Array, u.flags.ToSlice())
+	fmt.Println("sc2")
 
 	passwords := resp.NewData(resp.BulkString, "passwords")
 	passStrs := make([]string, 0, len(u.passwords))
