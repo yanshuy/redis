@@ -444,6 +444,7 @@ func HandleExec(c *client.Client) resp.Data {
 		return resp.Err("EXEC without MULTI")
 	}
 	if c.CASDirty {
+		c.CASDirty = false
 		return resp.NewData(resp.Array)
 	}
 
@@ -454,7 +455,6 @@ func HandleExec(c *client.Client) resp.Data {
 		res := HandleCmd(c, Command{cmd.Name, cmd.Args})
 		respArr = append(respArr, res)
 	}
-
 	c.CASDirty = false
 	return resp.NewData(resp.Array, respArr)
 }
@@ -466,6 +466,7 @@ func HandleDiscard(c *client.Client) resp.Data {
 		return resp.Err("DISCARD without MULTI")
 	}
 	c.QueuedCmds = nil
+	c.CASDirty = false
 	return resp.NewData(resp.String, "OK")
 }
 
