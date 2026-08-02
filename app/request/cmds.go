@@ -443,6 +443,9 @@ func HandleExec(c *client.Client) resp.Data {
 	} else {
 		return resp.Err("EXEC without MULTI")
 	}
+	if c.CASDirty {
+		return resp.NewData(resp.Array)
+	}
 	queued := c.QueuedCmds
 	c.QueuedCmds = nil
 	respArr := make([]resp.Data, 0, len(queued))
