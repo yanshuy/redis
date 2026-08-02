@@ -154,12 +154,11 @@ func (c *Client) HandleCmd(cmd Command) resp.Data {
 		} else {
 			return Err("EXEC without MULTI")
 		}
-		respArr := make([]resp.Data, len(c.queuedCmds))
+		respArr := make([]resp.Data, 0, len(c.queuedCmds))
 		for _, cmd := range c.queuedCmds {
 			resp := c.HandleCmd(cmd)
 			respArr = append(respArr, resp)
 		}
-		fmt.Printf("%+v\n", respArr)
 		return resp.NewData(resp.Array, respArr)
 	}
 
