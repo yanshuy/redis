@@ -148,6 +148,20 @@ func (c *Client) HandleCmd(cmd Command) resp.Data {
 		}
 	}
 
+	if cmd.name == "exec" {
+		if c.inMulti {
+			c.inMulti = false
+		} else {
+			return Err("EXEC without MULTI")
+		}
+		respArr := make([]resp.Data, len(c.queuedCmds))
+		for _, cmd := range c.queuedCmds {
+			resp := c.HandleCmd(cmd)
+			respArr = append(respArr, resp)
+		}
+		return resp.NewData(resp.Array, respArr)
+	}
+
 	if c.inMulti {
 		c.queuedCmds = append(c.queuedCmds, cmd)
 		return resp.NewData(resp.String, "QUEUED")
@@ -238,19 +252,6 @@ func (c *Client) HandleCmd(cmd Command) resp.Data {
 	case "multi":
 		c.inMulti = true
 		return resp.NewData(resp.String, "OK")
-
-	case "exec":
-		if c.inMulti {
-			c.inMulti = false
-		} else {
-			return Err("EXEC without MULTI")
-		}
-		respArr := make([]resp.Data, len(c.queuedCmds))
-		for _, cmd := range c.queuedCmds {
-			resp := c.HandleCmd(cmd)
-			respArr = append(respArr, resp)
-		}
-		return resp.NewData(resp.Array, respArr)
 
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd.name)
