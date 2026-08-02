@@ -17,6 +17,7 @@ type Client struct {
 	authAsUser    *User
 	InMulti       bool
 	QueuedCmds    []Command
+	WatchKeys     []string
 	CASDirty      bool
 	done          chan struct{}
 	Quit          bool

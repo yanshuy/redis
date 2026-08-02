@@ -475,7 +475,32 @@ func HandleWatch(c *client.Client, args []resp.Data) resp.Data {
 			return resp.Err("key must be a bulkstring")
 		}
 		key := keyData.Str
+		c.WatchKeys = append(c.WatchKeys, key)
 		store.RDB.WatchedKeys[key] = append(store.RDB.WatchedKeys[key], c)
 	}
 	return resp.NewData(resp.String, "OK")
+}
+
+func HandleUnWatch(c *client.Client) resp.Data {
+	for _, key := range c.WatchKeys {
+		clients := store.RDB.WatchedKeys[key]
+		clients = filter(clients, c)
+
+		if len(clients) == 0 {
+			delete(store.RDB.WatchedKeys, key)
+		} else {
+			store.RDB.WatchedKeys[key] = clients
+		}
+	}
+	c.WatchKeys = nil
+	return resp.NewData(resp.String, "OK")
+}
+
+func filter[T comparable](array []T, elem T) []T {
+	for i, item := range array {
+		if elem == item {
+			return append(array[:i], array[i+1:]...)
+		}
+	}
+	return array
 }
