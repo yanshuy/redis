@@ -45,9 +45,6 @@ func NewData(t byte, data ...any) Data {
 		return d
 	case Array:
 		for _, datum := range data {
-			if datum == nil {
-				return d
-			}
 			switch v := datum.(type) {
 			case Data:
 				d.Arr = append(d.Arr, v)
@@ -61,7 +58,7 @@ func NewData(t byte, data ...any) Data {
 					d.Arr = []Data{}
 					return d
 				}
-				d.Arr = make([]Data, len(v))
+				d.Arr = make([]Data, 0, len(v))
 				for _, elem := range v {
 					s := NewData(BulkString, elem)
 					d.Arr = append(d.Arr, s)

@@ -16,9 +16,7 @@ type User struct {
 
 func (u *User) ToRESP() resp.Data {
 	flags := resp.NewData(resp.BulkString, "flags")
-	fmt.Println("sc1")
 	flags_v := resp.NewData(resp.Array, u.flags.ToSlice())
-	fmt.Println("sc2")
 
 	passwords := resp.NewData(resp.BulkString, "passwords")
 	passStrs := make([]string, 0, len(u.passwords))
@@ -28,6 +26,7 @@ func (u *User) ToRESP() resp.Data {
 	passwords_v := resp.NewData(resp.Array, passStrs)
 
 	res := []resp.Data{flags, flags_v, passwords, passwords_v}
+	fmt.Printf("%+v\n", resp.NewData(resp.Array, res))
 	return resp.NewData(resp.Array, res)
 }
 

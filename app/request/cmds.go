@@ -191,7 +191,7 @@ func HandleBlpop(args []resp.Data) resp.Data {
 	}
 	s := <-msgChan
 	if s == "" {
-		return resp.NewData(resp.Array, nil)
+		return resp.NewData(resp.Array)
 	}
 	return resp.NewData(resp.Array, []string{key, s})
 }
@@ -294,7 +294,7 @@ func HandleConfig(args []resp.Data) resp.Data {
 		}
 		return resp.NewData(resp.Array, configs)
 	}
-	return resp.NewData(resp.Array, nil)
+	return resp.NewData(resp.Array)
 }
 
 func HandleKeys(args []resp.Data) resp.Data {
