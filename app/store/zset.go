@@ -15,13 +15,13 @@ type znode struct {
 	next *znode
 }
 
-type skiplist struct {
+type list struct {
 	head *znode
 }
 
 type Zset struct {
 	dict map[string]Z
-	list skiplist
+	list list
 }
 
 func (s Zset) len() int {
@@ -31,35 +31,45 @@ func (s Zset) len() int {
 func NewZset() Zset {
 	return Zset{
 		dict: make(map[string]Z),
-		list: skiplist{},
+		list: list{head: &znode{}},
 	}
 }
 
-func insert(s Zset, z Z) Zset {
-	s.dict[z.member] = z
-
-	if s.list.head == nil {
-		s.list.head = &znode{Z: z}
-		return s
-	}
-	if z.score < s.list.head.score {
-		s.list.head = &znode{
-			Z:    z,
-			next: s.list.head,
+func (s *Zset) remove(z Z) bool {
+	prev := s.list.head
+	for prev.next != nil {
+		if prev.next.member == z.member && prev.next.score == z.score {
+			prev.next = prev.next.next
+			return true
 		}
-		return s
+		prev = prev.next
 	}
+
+	return false
+}
+
+func (s *Zset) insert(z Z) bool {
+	old, ok := s.dict[z.member]
+	if ok {
+		s.remove(old)
+	}
+
+	s.dict[z.member] = z
+	node := &znode{Z: z}
+
 	cur := s.list.head
-	for cur.next != nil && cur.next.score < z.score {
+	for cur.next != nil {
+		if cur.next.score > z.score ||
+			(cur.next.score == z.score && cur.next.member > z.member) {
+			break
+		}
 		cur = cur.next
 	}
 
-	node := &znode{
-		Z:    z,
-		next: cur.next,
-	}
+	node.next = cur.next
 	cur.next = node
-	return s
+
+	return !ok
 }
 
 func (rs *RedisStore) Zadd(key string, score_member []string) (s int, err error) {
@@ -71,6 +81,7 @@ func (rs *RedisStore) Zadd(key string, score_member []string) (s int, err error)
 		return 0, fmt.Errorf("provided key '%s' holds some other data", key)
 	}
 
+	inserts := 0
 	for i := 0; i+1 < len(score_member); i += 2 {
 		score_str := score_member[i]
 		member := score_member[i+1]
@@ -79,9 +90,11 @@ func (rs *RedisStore) Zadd(key string, score_member []string) (s int, err error)
 		if err != nil {
 			return 0, err
 		}
-		m.data.Zset = insert(m.data.Zset, Z{member, score})
+		if m.data.Zset.insert(Z{member, score}) {
+			inserts++
+		}
 	}
 
 	rs.TouchWatchedKey(key)
-	return len(score_member) / 2, nil
+	return inserts, nil
 }
