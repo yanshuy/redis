@@ -470,13 +470,12 @@ func HandleWatch(c *client.Client, args []resp.Data) resp.Data {
 	if c.InMulti {
 		return resp.Err("WATCH inside MULTI is not allowed")
 	}
-	if len(args) != 1 {
-		return resp.WrongArgs("watch")
+	for _, keyData := range args {
+		if keyData.Type != resp.BulkString {
+			return resp.Err("key must be a bulkstring")
+		}
+		key := keyData.Str
+		store.RDB.WatchedKeys[key] = append(store.RDB.WatchedKeys[key], c)
 	}
-	if args[0].Type != resp.BulkString {
-		return resp.Err("key must be a bulkstring")
-	}
-	key := args[0].Str
-	store.RDB.WatchedKeys[key] = append(store.RDB.WatchedKeys[key], c)
 	return resp.NewData(resp.String, "OK")
 }
