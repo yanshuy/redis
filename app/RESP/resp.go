@@ -9,11 +9,12 @@ import (
 )
 
 const (
-	Error      byte = '-'
-	String     byte = '+'
-	Integer    byte = ':'
-	BulkString byte = '$'
-	Array      byte = '*'
+	Error          byte = '-'
+	String         byte = '+'
+	Integer        byte = ':'
+	NullBulkString byte = '0'
+	BulkString     byte = '$'
+	Array          byte = '*'
 )
 
 type Data struct {
@@ -39,6 +40,8 @@ func NewData(t byte, data ...any) Data {
 		return d
 	case String, BulkString:
 		d.Str = datum.(string)
+		return d
+	case NullBulkString:
 		return d
 	case Integer:
 		switch v := datum.(type) {
@@ -142,13 +145,10 @@ func (d *Data) ToResponse() []byte {
 		res = fmt.Append(res, d.Str+crlf)
 		return res
 
+	case NullBulkString:
+		return []byte("$-1\r\n")
+
 	case BulkString:
-		if d.Str == "-1" {
-			res := make([]byte, 0, 1+2+2)
-			res = append(res, BulkString)
-			res = fmt.Append(res, "-1"+crlf)
-			return res
-		}
 		first := string(BulkString) + strconv.Itoa(len(d.Str)) + crlf
 		res := make([]byte, 0, len(first)+len(d.Str)+2)
 		res = fmt.Append(res, first)

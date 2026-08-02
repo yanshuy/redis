@@ -107,7 +107,7 @@ func (rs *RedisStore) SaveRDBSnapshot() (err error) {
 		if value.ExpiryAt > 0 && value.ExpiryAt <= nowMs {
 			continue
 		}
-		if value.data.Type != STRING {
+		if value.Data.Type != STRING {
 			log.Println("ignoring type other than string")
 			continue
 		}
@@ -131,7 +131,7 @@ func (rs *RedisStore) SaveRDBSnapshot() (err error) {
 		if err != nil {
 			return err
 		}
-		err = writeEncodedString(w, value.data.String)
+		err = writeEncodedString(w, value.Data.String)
 		if err != nil {
 			return err
 		}
@@ -360,7 +360,7 @@ func (rs *RedisStore) RestoreRDBSnapshot() (err error) {
 					i += vLen
 
 					rs.Store[string(keyBytes)] = &Value{
-						data: Obj{
+						Data: Obj{
 							Type:   STRING,
 							String: string(valBytes),
 						},

@@ -21,7 +21,7 @@ func HandleGet(args []resp.Data) resp.Data {
 	if entry := store.RDB.Get(key); entry != nil {
 		return resp.NewData(resp.BulkString, entry.Value)
 	} else {
-		return resp.NewData(resp.BulkString, "-1")
+		return resp.NewData(resp.NullBulkString)
 	}
 }
 
@@ -126,7 +126,7 @@ func HandleLpop(args []resp.Data) resp.Data {
 	}
 	switch len(l) {
 	case 0:
-		return resp.NewData(resp.BulkString, "-1")
+		return resp.NewData(resp.NullBulkString)
 	case 1:
 		return resp.NewData(resp.BulkString, l[0])
 	default:
@@ -200,25 +200,65 @@ func HandleZadd(args []resp.Data) resp.Data {
 	if len(args) <= 1 {
 		return resp.WrongArgs("ZADD")
 	}
-
 	if !args[0].Is(resp.BulkString) {
 		return resp.Err("key must be a bulk string")
 	}
-	key := args[0].Str
 
-	strArgs := make([]string, 0, len(args)-1)
-	for _, arg := range args[1:] {
-		if arg.Is(resp.BulkString) {
-			strArgs = append(strArgs, arg.Str)
+	key := args[0].Str
+	m, ok := store.RDB.Look(key)
+	if ok && m.Data.Type != store.ZSET {
+		return resp.Err(fmt.Sprintf("provided key '%s' holds some other data", key))
+	}
+
+	args = args[1:]
+
+	n := len(args)
+	scores := make([]float64, 0, n/2)
+	members := make([]string, 0, n/2)
+
+	for i := 0; i+1 < n; i += 2 {
+		score_obj := args[i]
+		member := args[i+1]
+		if score_obj.Is(resp.BulkString) && member.Is(resp.BulkString) {
+			score, err := strconv.ParseFloat(score_obj.Str, 64)
+			if err != nil {
+				return resp.Err("invalid argument type for 'ZADD' expected score to be a float")
+			}
+			scores = append(scores, score)
+			members = append(members, member.Str)
 		} else {
 			return resp.Err("invalid argument type for 'ZADD' command expects bulk string")
 		}
 	}
-	l, err := store.RDB.Zadd(key, strArgs)
-	if err != nil {
-		return resp.Err(err.Error())
-	}
+
+	l := store.RDB.Zadd(key, scores, members)
 	return resp.NewData(resp.Integer, l)
+}
+
+func HandleZrank(args []resp.Data) resp.Data {
+	if len(args) < 2 {
+		return resp.WrongArgs("ZADD")
+	}
+	if !args[0].Is(resp.BulkString) && !args[1].Is(resp.BulkString) {
+		return resp.Err("invalid argument type for 'ZADD'")
+	}
+	key := args[0].Str
+	member := args[1].Str
+
+	m, ok := store.RDB.Look(key)
+	if !ok {
+		return resp.NewData(resp.NullBulkString)
+	}
+	if m.Data.Type != store.ZSET {
+		return resp.Err(fmt.Sprintf("provided key '%s' holds some other data", key))
+	}
+
+	rank, ok := store.RDB.Zrank(key, member)
+	if !ok {
+		return resp.NewData(resp.NullBulkString)
+	} else {
+		return resp.NewData(resp.Integer, rank)
+	}
 }
 
 func HandleType(args []resp.Data) resp.Data {

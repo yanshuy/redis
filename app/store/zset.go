@@ -1,10 +1,5 @@
 package store
 
-import (
-	"fmt"
-	"strconv"
-)
-
 type Z struct {
 	member string
 	score  float64
@@ -72,29 +67,43 @@ func (s *Zset) insert(z Z) bool {
 	return !ok
 }
 
-func (rs *RedisStore) Zadd(key string, score_member []string) (s int, err error) {
-	m, ok := rs.Look(key)
-	if !ok {
+func (rs *RedisStore) Zrank(key, member string) (int, bool) {
+	m, _ := rs.Look(key)
+	z := m.Data.Zset
+
+	if _, ok := z.dict[member]; !ok {
+		return 0, false
+	}
+
+	rank := -1
+	cur := z.list.head
+	for cur != nil {
+		if cur.member == member {
+			break
+		}
+		rank++
+		cur = cur.next
+	}
+	return rank, true
+}
+
+func (rs *RedisStore) Zadd(key string, scores []float64, member []string) int {
+	m, _ := rs.Look(key)
+	if m == nil {
 		m = rs.NewStoreMember(key, ZSET)
 	}
-	if m.data.Type != ZSET {
-		return 0, fmt.Errorf("provided key '%s' holds some other data", key)
-	}
+
+	z := m.Data.Zset
 
 	inserts := 0
-	for i := 0; i+1 < len(score_member); i += 2 {
-		score_str := score_member[i]
-		member := score_member[i+1]
-
-		score, err := strconv.ParseFloat(score_str, 64)
-		if err != nil {
-			return 0, err
-		}
-		if m.data.Zset.insert(Z{member, score}) {
+	for i := range scores {
+		score := scores[i]
+		member := member[i]
+		if z.insert(Z{member, score}) {
 			inserts++
 		}
 	}
 
 	rs.TouchWatchedKey(key)
-	return inserts, nil
+	return inserts
 }

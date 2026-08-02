@@ -10,15 +10,15 @@ import (
 
 type Value struct {
 	ExpiryAt int64
-	data     Obj
+	Data     Obj
 }
 
 func (rs *RedisStore) NewStoreMember(key string, t ObjType) *Value {
 	m := &Value{
-		data: Obj{Type: t},
+		Data: Obj{Type: t},
 	}
 	if t == ZSET {
-		m.data.Zset = NewZset()
+		m.Data.Zset = NewZset()
 	}
 	rs.Store[key] = m
 	return m
@@ -64,7 +64,7 @@ type Obj struct {
 
 func (rs *RedisStore) Type(key string) string {
 	if m, ok := rs.Look(key); ok {
-		switch m.data.Type {
+		switch m.Data.Type {
 		case STRING:
 			return "string"
 		case LIST:
@@ -86,7 +86,7 @@ func (rs *RedisStore) RemoveMemberAfter(ttl_ms int64, key string) {
 
 func (rs *RedisStore) Set(key string, val string, ttl_ms int64) {
 	mem := rs.NewStoreMember(key, STRING)
-	mem.data.String = val
+	mem.Data.String = val
 	if ttl_ms > 0 {
 		mem.ExpiryAt = time.Now().UnixMilli() + ttl_ms
 		go rs.RemoveMemberAfter(ttl_ms, key)
@@ -108,11 +108,11 @@ func (rs *RedisStore) Get(key string) *Entry {
 		delete(rs.Store, key)
 		return nil
 	}
-	if mem.data.Type != STRING {
+	if mem.Data.Type != STRING {
 		return nil
 	}
 	return &Entry{
-		Value:    mem.data.String,
+		Value:    mem.Data.String,
 		ExpiryAt: mem.ExpiryAt,
 	}
 }
