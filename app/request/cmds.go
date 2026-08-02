@@ -443,6 +443,7 @@ func HandleExec(c *client.Client) resp.Data {
 	} else {
 		return resp.Err("EXEC without MULTI")
 	}
+	fmt.Println(c.CASDirty)
 	if c.CASDirty {
 		return resp.NewData(resp.Array)
 	}
