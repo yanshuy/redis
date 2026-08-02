@@ -446,6 +446,7 @@ func HandleExec(c *client.Client) resp.Data {
 	if c.CASDirty {
 		return resp.NewData(resp.Array)
 	}
+
 	queued := c.QueuedCmds
 	c.QueuedCmds = nil
 	respArr := make([]resp.Data, 0, len(queued))
@@ -453,6 +454,8 @@ func HandleExec(c *client.Client) resp.Data {
 		res := HandleCmd(c, Command{cmd.Name, cmd.Args})
 		respArr = append(respArr, res)
 	}
+
+	c.CASDirty = false
 	return resp.NewData(resp.Array, respArr)
 }
 
