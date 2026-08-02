@@ -113,9 +113,6 @@ func (rs *RedisStore) Zrange(key string, start int, end int) []string {
 	z := m.Data.Zset
 
 	n := z.len()
-	if n < start {
-		return []string{}
-	}
 
 	cur := z.list.head.next
 	for range start {
@@ -123,10 +120,13 @@ func (rs *RedisStore) Zrange(key string, start int, end int) []string {
 	}
 
 	if start < 0 {
-		start = n + start
+		start = max(n+start, 0)
 	}
 	if end < 0 {
-		end = n + end
+		end = max(n+end, 0)
+	}
+	if n < start || start > end {
+		return []string{}
 	}
 
 	list := make([]string, 0, end-start+1)
