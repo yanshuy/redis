@@ -110,7 +110,9 @@ func (rs *RedisStore) Keys(pattern string) []string {
 
 func (rs *RedisStore) TouchWatchedKey(key string) {
 	for _, c := range rs.WatchedKeys[key] {
-		c.CASDirty = true
+		if c.InWatch() {
+			c.CASDirty = true
+		}
 	}
 }
 

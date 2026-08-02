@@ -31,6 +31,10 @@ func (c *Client) SubscriptionCount() int {
 	return len(c.subscriptions)
 }
 
+func (c *Client) InWatch() bool {
+	return len(c.WatchKeys) > 0
+}
+
 func (c *Client) Write(b []byte) (int, error) {
 	return c.conn.Write(b)
 }
