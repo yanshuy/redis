@@ -159,6 +159,7 @@ func (c *Client) HandleCmd(cmd Command) resp.Data {
 			resp := c.HandleCmd(cmd)
 			respArr = append(respArr, resp)
 		}
+		fmt.Printf("%+v\n", respArr)
 		return resp.NewData(resp.Array, respArr)
 	}
 
