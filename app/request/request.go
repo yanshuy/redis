@@ -7,50 +7,17 @@ import (
 	"strings"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
+	"github.com/codecrafters-io/redis-starter-go/app/client"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
-type Client struct {
-	conn          io.WriteCloser
-	subscriptions map[string]chan string
-	authAsUser    *User
-	inMulti       bool
-	queuedCmds    []Command
-	done          chan struct{}
-	quit          bool
-}
-
-func (c *Client) inSubscribeMode() bool {
-	return len(c.subscriptions) > 0
-}
-
-func (c *Client) Close() error {
-	for channel := range c.subscriptions {
-		Chans.unsubscribe(channel, c)
-	}
-	return c.conn.Close()
-}
-
-func (c *Client) isAuthenticated() bool {
-	return c.authAsUser != nil
-}
-
-func NewClient(conn io.WriteCloser) *Client {
-	var user *User
-	if DefaultUser.flags.Contains("nopass") {
-		user = DefaultUser
-	}
-	doneChan := make(chan struct{})
-
-	return &Client{
-		conn:       conn,
-		authAsUser: user,
-		done:       doneChan,
-	}
+type Command struct {
+	name string
+	args []resp.Data
 }
 
 func ReadAndHandleRequest(conn io.ReadWriteCloser) (n int, err error) {
-	c := NewClient(conn)
+	c := client.NewClient(conn)
 	// TODO: request > 1024
 	b := make([]byte, 1024)
 	bLen := 0
@@ -63,7 +30,7 @@ func ReadAndHandleRequest(conn io.ReadWriteCloser) (n int, err error) {
 				return bLen, err
 			}
 			if o > 0 {
-				err := c.HandleRequests(conn, r)
+				err := HandleRequests(c, r)
 				if err != nil {
 					return bLen, err
 				}
@@ -83,37 +50,32 @@ func ReadAndHandleRequest(conn io.ReadWriteCloser) (n int, err error) {
 	return bLen, nil
 }
 
-func (c *Client) HandleRequests(w io.Writer, requests []resp.Data) (err error) {
+func HandleRequests(c *client.Client, requests []resp.Data) (err error) {
 	for _, req := range requests {
-		res := c.execute(req)
+		res := execute(c, req)
 
 		resBytes := res.ToResponse()
-		if _, err := w.Write(resBytes); err != nil {
+		if _, err := c.Write(resBytes); err != nil {
 			return err
 		}
-		if c.quit {
+		if c.Quit {
 			return c.Close()
 		}
 	}
 	return nil
 }
 
-type Command struct {
-	name string
-	args []resp.Data
-}
-
-func (c *Client) execute(req resp.Data) resp.Data {
+func execute(c *client.Client, req resp.Data) resp.Data {
 	cmd := Command{}
 
 	switch req.Type {
 	case resp.Array:
 		if len(req.Arr) == 0 {
-			return Err("empty command")
+			return resp.Err("empty command")
 		}
 		first := req.Arr[0]
 		if first.Type != resp.BulkString && first.Type != resp.String {
-			return Err("invalid command")
+			return resp.Err("invalid command")
 		}
 		cmd.name = strings.ToLower(first.Str)
 		cmd.args = req.Arr[1:]
@@ -121,44 +83,47 @@ func (c *Client) execute(req resp.Data) resp.Data {
 	case resp.String, resp.BulkString:
 		cmd.name = req.Str
 	default:
-		return Err("invalid command")
+		return resp.Err("invalid command")
 	}
 
 	if cmd.name == "quit" {
-		c.quit = true
+		c.Quit = true
 		return resp.NewData(resp.String, "OK")
 	}
 
-	if !c.isAuthenticated() {
+	if !c.IsAuthenticated() {
 		switch cmd.name {
 		case "auth", "hello", "ping":
 		default:
-			return NoAuth()
+			return resp.NoAuth()
 		}
 	}
 
-	return c.HandleCmd(cmd)
+	if c.InMulti {
+		switch cmd.name {
+		case "exec", "discard":
+		default:
+			c.QueuedCmds = append(c.QueuedCmds, client.Command{
+				Name: cmd.name,
+				Args: cmd.args,
+			})
+			return resp.NewData(resp.String, "QUEUED")
+		}
+	}
+
+	return HandleCmd(c, cmd)
 }
 
-func (c *Client) HandleCmd(cmd Command) resp.Data {
+func HandleCmd(c *client.Client, cmd Command) resp.Data {
 	args := cmd.args
 
-	if c.inSubscribeMode() {
+	if c.InSubscribeMode() {
 		switch cmd.name {
 		case "ping":
 			return resp.NewData(resp.Array, "pong", "")
 		case "subscribe", "unsubscribe":
 		default:
-			return Err(fmt.Sprintf("Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", cmd.name))
-		}
-	}
-
-	if c.inMulti {
-		switch cmd.name {
-		case "exec", "discard":
-		default:
-			c.queuedCmds = append(c.queuedCmds, cmd)
-			return resp.NewData(resp.String, "QUEUED")
+			return resp.Err(fmt.Sprintf("Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", cmd.name))
 		}
 	}
 
@@ -168,21 +133,21 @@ func (c *Client) HandleCmd(cmd Command) resp.Data {
 
 	case "echo":
 		if len(args) != 1 {
-			return WrongArgs("echo")
+			return resp.WrongArgs("echo")
 		}
 		return args[0]
 
 	case "get":
-		return HandleCmdGet(args)
+		return HandleGet(args)
 
 	case "set":
-		return HandleCmdSet(args)
+		return HandleSet(args)
 
 	case "acl":
-		return HandleCmdACL(args)
+		return HandleACL(args)
 
 	case "auth":
-		return HandleCmdAuth(c, args)
+		return HandleAuth(c, args)
 
 	case "rpush":
 		return HandleRpush(args)
@@ -224,7 +189,7 @@ func (c *Client) HandleCmd(cmd Command) resp.Data {
 		err := store.RDB.SaveRDBSnapshot()
 		if err != nil {
 			log.Println(err)
-			return Err("save failed")
+			return resp.Err("save failed")
 		}
 		return resp.NewData(resp.String, "OK")
 
@@ -241,52 +206,20 @@ func (c *Client) HandleCmd(cmd Command) resp.Data {
 		return HandleCmdIncr(args)
 
 	case "multi":
-		c.inMulti = true
+		c.InMulti = true
 		return resp.NewData(resp.String, "OK")
 
 	case "exec":
-		if c.inMulti {
-			c.inMulti = false
-		} else {
-			return Err("EXEC without MULTI")
-		}
-		respArr := make([]resp.Data, 0, len(c.queuedCmds))
-		for _, cmd := range c.queuedCmds {
-			resp := c.HandleCmd(cmd)
-			respArr = append(respArr, resp)
-		}
-		c.queuedCmds = nil
-		return resp.NewData(resp.Array, respArr)
+		return HandleExec(c)
 
 	case "discard":
-		if c.inMulti {
-			c.inMulti = false
-		} else {
-			return Err("DISCARD without MULTI")
-		}
-		c.queuedCmds = nil
-		return resp.NewData(resp.String, "OK")
+		return HandleDiscard(c)
+
+	case "watch":
+		return HandleWatch(c, args)
 
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd.name)
-		return Err(msg)
+		return resp.Err(msg)
 	}
-}
-
-func Err(msg string) resp.Data {
-	return resp.NewData(resp.Error, "ERR "+msg)
-}
-
-func WrongPass() resp.Data {
-	return resp.NewData(resp.Error,
-		"WRONGPASS invalid username-password pair or user is disabled.")
-}
-
-func NoAuth() resp.Data {
-	return resp.NewData(resp.Error,
-		"NOAUTH Authentication required.")
-}
-
-func WrongArgs(cmd string) resp.Data {
-	return Err("wrong number of arguments for '" + cmd + "' command")
 }

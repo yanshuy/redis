@@ -1,8 +1,9 @@
-package request
+package client
 
 import (
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"strings"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
@@ -40,6 +41,20 @@ var users = map[string]*User{
 	"default": DefaultUser,
 }
 
+func NewClient(conn io.WriteCloser) *Client {
+	var user *User
+	if DefaultUser.flags.Contains("nopass") {
+		user = DefaultUser
+	}
+	doneChan := make(chan struct{})
+
+	return &Client{
+		conn:       conn,
+		authAsUser: user,
+		done:       doneChan,
+	}
+}
+
 var currentUser = "default"
 
 func ACL_WHOAMI() resp.Data {
@@ -50,7 +65,7 @@ func ACL_GETUSER(username string) resp.Data {
 	if user, ok := users[username]; ok {
 		return user.ToRESP()
 	} else {
-		return Err("User does not exist.")
+		return resp.Err("User does not exist.")
 	}
 }
 
@@ -65,7 +80,7 @@ func ACL_SETUSER(username string, rule string) resp.Data {
 		}
 		return resp.NewData(resp.String, "OK")
 	} else {
-		return Err("User does not exist.")
+		return resp.Err("User does not exist.")
 	}
 }
 
@@ -77,42 +92,9 @@ func Authenticate(c *Client, username string, password string) resp.Data {
 			c.authAsUser = user
 			return resp.NewData(resp.String, "OK")
 		}
-		return WrongPass()
+		return resp.WrongPass()
 
 	} else {
-		return Err("User does not exist.")
+		return resp.Err("User does not exist.")
 	}
-}
-
-type Set[T comparable] map[T]struct{}
-
-func NewSet[T comparable](items ...T) Set[T] {
-	s := make(Set[T])
-	s.Add(items...)
-	return s
-}
-
-func (s Set[T]) Add(items ...T) {
-	for _, item := range items {
-		s[item] = struct{}{}
-	}
-}
-
-func (s Set[T]) Remove(items ...T) {
-	for _, item := range items {
-		delete(s, item)
-	}
-}
-
-func (s Set[T]) Contains(item T) bool {
-	_, ok := s[item]
-	return ok
-}
-
-func (s Set[T]) ToSlice() []T {
-	result := make([]T, 0, len(s))
-	for item := range s {
-		result = append(result, item)
-	}
-	return result
 }

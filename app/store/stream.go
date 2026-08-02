@@ -75,6 +75,7 @@ func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (s string,
 	}
 	stream.LastID = streamId
 	stream.Entries = append(stream.Entries, StreamEntry{streamId, key_vals})
+	rs.TouchWatchedKey(key)
 	return fmt.Sprintf("%d-%d", time_ms, seqNo), nil
 }
 

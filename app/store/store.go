@@ -4,6 +4,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/codecrafters-io/redis-starter-go/app/client"
 )
 
 type Value struct {
@@ -20,10 +22,11 @@ func (rs *RedisStore) NewStoreMember(key string, t DataType) *Value {
 }
 
 type RedisStore struct {
-	Store     map[string]*Value
-	Config    map[string]string
-	Listeners map[string][]chan struct{}
-	mu        sync.Mutex
+	Store       map[string]*Value
+	Config      map[string]string
+	Listeners   map[string][]chan struct{}
+	WatchedKeys map[string][]*client.Client
+	mu          sync.Mutex
 }
 
 func (rs *RedisStore) Look(key string) (*Value, bool) {
@@ -32,10 +35,11 @@ func (rs *RedisStore) Look(key string) (*Value, bool) {
 }
 
 var RDB RedisStore = RedisStore{
-	Store:     make(map[string]*Value),
-	Config:    make(map[string]string),
-	Listeners: make(map[string][]chan struct{}),
-	mu:        sync.Mutex{},
+	Store:       make(map[string]*Value),
+	Config:      make(map[string]string),
+	Listeners:   make(map[string][]chan struct{}),
+	WatchedKeys: make(map[string][]*client.Client),
+	mu:          sync.Mutex{},
 }
 
 type DataType int
@@ -53,7 +57,7 @@ type Data struct {
 	List   []string
 }
 
-func (rs *RedisStore) RemoveMemberAfter(ttl_ms int64, key string) {
+func (rs *RedisStore) RemoveValueAfter(ttl_ms int64, key string) {
 	timer := time.NewTimer(time.Duration(ttl_ms) * time.Millisecond)
 	<-timer.C
 	delete(rs.Store, key)
@@ -64,8 +68,9 @@ func (rs *RedisStore) Set(key string, val string, ttl_ms int64) {
 	mem.data.String = val
 	if ttl_ms > 0 {
 		mem.ExpiryAt = time.Now().UnixMilli() + ttl_ms
-		go rs.RemoveMemberAfter(ttl_ms, key)
+		go rs.RemoveValueAfter(ttl_ms, key)
 	}
+	rs.TouchWatchedKey(key)
 }
 
 type Entry struct {
@@ -101,6 +106,12 @@ func (rs *RedisStore) Keys(pattern string) []string {
 		}
 	}
 	return ans
+}
+
+func (rs *RedisStore) TouchWatchedKey(key string) {
+	for _, c := range rs.WatchedKeys[key] {
+		c.CASDirty = true
+	}
 }
 
 func (rs *RedisStore) Type(key string) string {

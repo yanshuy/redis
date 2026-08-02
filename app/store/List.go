@@ -20,6 +20,7 @@ func (rs *RedisStore) Rpush(key string, val []string) (int, error) {
 		mem.data.List = append(mem.data.List, val...)
 	}
 	go rs.NotifyListener(key)
+	rs.TouchWatchedKey(key)
 	return len(mem.data.List), nil
 }
 
@@ -37,6 +38,7 @@ func (rs *RedisStore) Lpush(key string, val []string) (int, error) {
 		mem.data.List = append(mem.data.List, val...)
 	}
 	go rs.NotifyListener(key)
+	rs.TouchWatchedKey(key)
 	return len(mem.data.List), nil
 }
 
@@ -53,6 +55,7 @@ func (rs *RedisStore) Lpop(key string, popCount int) ([]string, error) {
 			popped = append(popped, item)
 		}
 		m.data.List = m.data.List[popCount:]
+		rs.TouchWatchedKey(key)
 		return popped, nil
 	} else {
 		return nil, nil

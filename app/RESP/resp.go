@@ -174,3 +174,19 @@ func (d *Data) ToResponse() []byte {
 		return []byte{}
 	}
 }
+
+func Err(msg string) Data {
+	return NewData(Error, "ERR "+msg)
+}
+
+func WrongPass() Data {
+	return NewData(Error, "WRONGPASS invalid username-password pair or user is disabled.")
+}
+
+func NoAuth() Data {
+	return NewData(Error, "NOAUTH Authentication required.")
+}
+
+func WrongArgs(cmd string) Data {
+	return Err("wrong number of arguments for '" + cmd + "' command")
+}

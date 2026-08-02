@@ -4,19 +4,19 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
+	"github.com/codecrafters-io/redis-starter-go/app/client"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
-func HandleCmdGet(args []resp.Data) resp.Data {
+func HandleGet(args []resp.Data) resp.Data {
 	if len(args) != 1 {
-		return WrongArgs("get")
+		return resp.WrongArgs("get")
 	}
 	key := args[0].Str
 	if key == "" {
-		return Err("key must be a string length > 0")
+		return resp.Err("key must be a string length > 0")
 	}
 	if entry := store.RDB.Get(key); entry != nil {
 		return resp.NewData(resp.BulkString, entry.Value)
@@ -25,14 +25,14 @@ func HandleCmdGet(args []resp.Data) resp.Data {
 	}
 }
 
-func HandleCmdSet(args []resp.Data) resp.Data {
+func HandleSet(args []resp.Data) resp.Data {
 	if len(args) < 2 {
-		return WrongArgs("set")
+		return resp.WrongArgs("set")
 	}
 	key := args[0].Str
 	val := args[1].Str
 	if key == "" || val == "" {
-		return Err("key, val must be a string length > 0")
+		return resp.Err("key, val must be a string length > 0")
 	}
 	var expiry int64
 	if len(args) >= 4 {
@@ -41,7 +41,7 @@ func HandleCmdSet(args []resp.Data) resp.Data {
 		case "px", "ex":
 			exp, err := args[3].Integer()
 			if err != nil {
-				return Err("wrong expiry time expected a number")
+				return resp.Err("wrong expiry time expected a number")
 			}
 			if arg == "ex" {
 				expiry = exp * 1000
@@ -50,7 +50,7 @@ func HandleCmdSet(args []resp.Data) resp.Data {
 			}
 
 		default:
-			return Err("unknown argument for 'set' command")
+			return resp.Err("unknown argument for 'set' command")
 		}
 	}
 
@@ -60,69 +60,69 @@ func HandleCmdSet(args []resp.Data) resp.Data {
 
 func HandleRpush(args []resp.Data) resp.Data {
 	if len(args) < 2 {
-		return WrongArgs("rpush")
+		return resp.WrongArgs("rpush")
 	}
 	key := args[0].Str
 	if key == "" {
-		return Err("key must be a string length > 0")
+		return resp.Err("key must be a string length > 0")
 	}
 	strArgs := make([]string, 0, len(args)-1)
 	for _, arg := range args[1:] {
 		if arg.Is(resp.BulkString) {
 			strArgs = append(strArgs, arg.Str)
 		} else {
-			return Err("invalid argument type for 'rpush' command expects only string")
+			return resp.Err("invalid argument type for 'rpush' command expects only string")
 		}
 	}
 	l, err := store.RDB.Rpush(key, strArgs)
 	if err != nil {
-		return Err(err.Error())
+		return resp.Err(err.Error())
 	}
 	return resp.NewData(resp.Integer, int64(l))
 }
 
 func HandleLpush(args []resp.Data) resp.Data {
 	if len(args) < 2 {
-		return WrongArgs("lpush")
+		return resp.WrongArgs("lpush")
 	}
 	key := args[0].Str
 	if key == "" {
-		return Err("key must be a string length > 0")
+		return resp.Err("key must be a string length > 0")
 	}
 	strArgs := make([]string, 0, len(args)-1)
 	for _, arg := range args[1:] {
 		if arg.Is(resp.BulkString) {
 			strArgs = append(strArgs, arg.Str)
 		} else {
-			return Err("invalid argument type for 'lpush' command expects only string")
+			return resp.Err("invalid argument type for 'lpush' command expects only string")
 		}
 	}
 	l, err := store.RDB.Lpush(key, strArgs)
 	if err != nil {
-		return Err(err.Error())
+		return resp.Err(err.Error())
 	}
 	return resp.NewData(resp.Integer, int64(l))
 }
 
 func HandleLpop(args []resp.Data) resp.Data {
 	if len(args) < 1 || len(args) > 2 {
-		return WrongArgs("lpop")
+		return resp.WrongArgs("lpop")
 	}
 	key := args[0].Str
 	if key == "" {
-		return Err("key must be a string length > 0")
+		return resp.Err("key must be a string length > 0")
 	}
 	pops := 1
 	if len(args) == 2 {
 		p, err := args[1].Integer()
 		if err != nil {
-			return Err("2nd argument must be a integer")
+			return resp.Err("2nd argument must be a integer")
 		}
 		pops = int(p)
 	}
 	l, err := store.RDB.Lpop(key, pops)
 	if err != nil {
-		return Err(err.Error())
+		return resp.Err(err.Error())
 	}
 	switch len(l) {
 	case 0:
@@ -136,58 +136,58 @@ func HandleLpop(args []resp.Data) resp.Data {
 
 func HandleLlen(args []resp.Data) resp.Data {
 	if len(args) != 1 {
-		return WrongArgs("llen")
+		return resp.WrongArgs("llen")
 	}
 	key := args[0].Str
 	if key == "" {
-		return Err("key must be a string length > 0")
+		return resp.Err("key must be a string length > 0")
 	}
 	l, err := store.RDB.Llen(key)
 	if err != nil {
-		return Err(err.Error())
+		return resp.Err(err.Error())
 	}
 	return resp.NewData(resp.Integer, int64(l))
 }
 
 func HandleLrange(args []resp.Data) resp.Data {
 	if len(args) != 3 {
-		return WrongArgs("lrange")
+		return resp.WrongArgs("lrange")
 	}
 	key := args[0].Str
 	if key == "" {
-		return Err("key, val must be a string length > 0")
+		return resp.Err("key, val must be a string length > 0")
 	}
 	startIdx, err := args[1].Integer()
 	if err != nil {
-		return Err("expected start index to be an integer for 'lrange' command")
+		return resp.Err("expected start index to be an integer for 'lrange' command")
 	}
 	endIdx, err := args[2].Integer()
 	if err != nil {
-		return Err("expected end index to be an integer for 'lrange' command")
+		return resp.Err("expected end index to be an integer for 'lrange' command")
 	}
 	elems, err := store.RDB.Lrange(key, int(startIdx), int(endIdx))
 	if err != nil {
-		return Err(err.Error())
+		return resp.Err(err.Error())
 	}
 	return resp.NewData(resp.Array, elems)
 }
 
 func HandleBlpop(args []resp.Data) resp.Data {
 	if len(args) != 2 {
-		return WrongArgs("blpop")
+		return resp.WrongArgs("blpop")
 	}
 	key := args[0].Str
 	if key == "" {
-		return Err("key, val must be a string length > 0")
+		return resp.Err("key, val must be a string length > 0")
 	}
 	timeout_s, err := strconv.ParseFloat(args[1].Str, 10)
 	if err != nil {
-		return Err("expected 2 argument to be an number for 'blpop' command")
+		return resp.Err("expected 2 argument to be an number for 'blpop' command")
 	}
 
 	msgChan, err := store.RDB.Blpop(key, timeout_s)
 	if err != nil {
-		return Err(err.Error())
+		return resp.Err(err.Error())
 	}
 	s := <-msgChan
 	if s == "" {
@@ -198,11 +198,11 @@ func HandleBlpop(args []resp.Data) resp.Data {
 
 func HandleType(args []resp.Data) resp.Data {
 	if len(args) != 1 {
-		return WrongArgs("type")
+		return resp.WrongArgs("type")
 	}
 	key := args[0].Str
 	if key == "" {
-		return Err("key, val must be a string length > 0")
+		return resp.Err("key, val must be a string length > 0")
 	}
 	t := store.RDB.Type(key)
 	return resp.NewData(resp.String, t)
@@ -210,50 +210,50 @@ func HandleType(args []resp.Data) resp.Data {
 
 func HandleXadd(args []resp.Data) resp.Data {
 	if len(args) < 2 {
-		return WrongArgs("xadd")
+		return resp.WrongArgs("xadd")
 	}
 	key := args[0].Str
 	stream_key := args[1].Str
 	if key == "" || stream_key == "" {
-		return Err("key, val must be a string length > 0")
+		return resp.Err("key, val must be a string length > 0")
 	}
 	rest := args[2:]
 	key_vals := make([]string, 0, len(args[2:]))
 	for i := 0; i < len(rest); i += 2 {
 		key := rest[i]
 		if key.Str == "" {
-			return Err("key, val must be a string length > 0")
+			return resp.Err("key, val must be a string length > 0")
 		}
 		if i+1 > len(rest) {
-			return Err(fmt.Sprintf("no value for the key %s specified", key.Str))
+			return resp.Err(fmt.Sprintf("no value for the key %s specified", key.Str))
 		}
 		val := rest[i+1]
 		if val.Str == "" {
-			return Err("key, val must be a string length > 0")
+			return resp.Err("key, val must be a string length > 0")
 		}
 		key_vals = append(key_vals, key.Str, val.Str)
 	}
 	s, err := store.RDB.Xadd(key, stream_key, key_vals)
 	if err != nil {
-		return Err(err.Error())
+		return resp.Err(err.Error())
 	}
 	return resp.NewData(resp.BulkString, s)
 }
 
 func HandleXrange(args []resp.Data) resp.Data {
 	if len(args) != 3 {
-		return WrongArgs("xrange")
+		return resp.WrongArgs("xrange")
 	}
 	key := args[0].Str
 	if key == "" {
-		return Err("key, val must be a string length > 0")
+		return resp.Err("key, val must be a string length > 0")
 	}
 	startStr := args[1].Str
 	endStr := args[2].Str
 
 	entries, err := store.RDB.XRange(key, startStr, endStr)
 	if err != nil {
-		return Err(err.Error())
+		return resp.Err(err.Error())
 	}
 
 	res := resp.NewData(resp.Array)
@@ -274,7 +274,7 @@ func HandleXread(args []resp.Data) resp.Data {
 
 func HandleConfig(args []resp.Data) resp.Data {
 	if len(args) < 2 {
-		return WrongArgs("config")
+		return resp.WrongArgs("config")
 	}
 
 	sub := strings.ToLower(args[0].Str)
@@ -283,14 +283,14 @@ func HandleConfig(args []resp.Data) resp.Data {
 		strArgs := make([]string, 0, len(args))
 		for _, arg := range args[1:] {
 			if arg.Str == "" {
-				return Err("argument must be a string length > 0")
+				return resp.Err("argument must be a string length > 0")
 			}
 			strArgs = append(strArgs, arg.Str)
 		}
 
 		configs, err := store.RDB.ConfigGet(strArgs)
 		if err != nil {
-			return Err(err.Error())
+			return resp.Err(err.Error())
 		}
 		return resp.NewData(resp.Array, configs)
 	}
@@ -299,157 +299,70 @@ func HandleConfig(args []resp.Data) resp.Data {
 
 func HandleKeys(args []resp.Data) resp.Data {
 	if len(args) != 1 {
-		return WrongArgs("keys")
+		return resp.WrongArgs("keys")
 	}
 	pattern := args[0].Str
 	if pattern == "" {
-		return Err("key, val must be a string length > 0")
+		return resp.Err("key, val must be a string length > 0")
 	}
 	keys := store.RDB.Keys(pattern)
 	return resp.NewData(resp.Array, keys)
 }
 
-type Channels struct {
-	Channels map[string][]*Client
-	mu       sync.Mutex
-}
-
-func (c *Channels) subscribers(channel string) int {
-	return len(c.Channels[channel])
-}
-
-func (c *Channels) subscribe(channel string, client *Client) {
-	if client.subscriptions == nil {
-		client.subscriptions = make(map[string]chan string)
-	}
-	if _, ok := client.subscriptions[channel]; ok {
-		return
-	}
-	cn := make(chan string, 1)
-	client.subscriptions[channel] = cn
-
-	c.mu.Lock()
-	c.Channels[channel] = append(c.Channels[channel], client)
-	c.mu.Unlock()
-
-	go func() {
-		for {
-			select {
-			case msg, ok := <-cn:
-				if !ok {
-					return
-				}
-				res := resp.NewData(resp.Array, "message", channel, msg)
-				client.conn.Write(res.ToResponse())
-			case <-client.done:
-				return
-			}
-		}
-	}()
-}
-
-func (c *Channels) unsubscribe(channel string, client *Client) {
-	ch, ok := client.subscriptions[channel]
-	if !ok {
-		return
-	}
-
-	c.mu.Lock()
-
-	subs := c.Channels[channel]
-	for i, c := range subs {
-		if c == client {
-			subs = append(subs[:i], subs[i+1:]...)
-			break
-		}
-	}
-	if len(subs) == 0 {
-		delete(c.Channels, channel)
-	} else {
-		c.Channels[channel] = subs
-	}
-
-	c.mu.Unlock()
-
-	close(ch)
-	delete(client.subscriptions, channel)
-
-	if len(client.subscriptions) == 0 {
-		client.done <- struct{}{}
-	}
-}
-
-func (c *Channels) Publish(channel string, message string) int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	delivered := 0
-	subs := c.Channels[channel]
-	for _, client := range subs {
-		ch := client.subscriptions[channel]
-		ch <- message
-		delivered++
-	}
-	return delivered
-}
-
-var Chans = Channels{
-	Channels: make(map[string][]*Client),
-}
-
-func HandleSubscribe(c *Client, args []resp.Data) resp.Data {
+func HandleSubscribe(c *client.Client, args []resp.Data) resp.Data {
 	if len(args) != 1 {
-		return WrongArgs("subscribe")
+		return resp.WrongArgs("subscribe")
 	}
 	channel := args[0].Str
 	if channel == "" {
-		return Err("channel name must be a string length > 0")
+		return resp.Err("channel name must be a string length > 0")
 	}
 
-	Chans.subscribe(channel, c)
+	client.Chans.Subscribe(channel, c)
 
 	return resp.NewData(
 		resp.Array,
 		[]string{"subscribe", channel},
-		resp.NewData(resp.Integer, int64(len(c.subscriptions))),
+		resp.NewData(resp.Integer, int64(c.SubscriptionCount())),
 	)
 }
 
 func HandlePublish(args []resp.Data) resp.Data {
 	if len(args) != 2 {
-		return WrongArgs("publish")
+		return resp.WrongArgs("publish")
 	}
 	channel := args[0].Str
 	if channel == "" {
-		return Err("channel name must be a string length > 0")
+		return resp.Err("channel name must be a string length > 0")
 	}
 	message := args[1].Str
 	if channel == "" {
-		return Err("message name must be a string length > 0")
+		return resp.Err("message name must be a string length > 0")
 	}
 
-	n := Chans.Publish(channel, message)
+	n := client.Chans.Publish(channel, message)
 	return resp.NewData(resp.Integer, int64(n))
 }
 
-func HandleUnsubscribe(c *Client, args []resp.Data) resp.Data {
+func HandleUnsubscribe(c *client.Client, args []resp.Data) resp.Data {
 	if len(args) != 1 {
-		return WrongArgs("unsubscribe")
+		return resp.WrongArgs("unsubscribe")
 	}
 	channel := args[0].Str
 	if channel == "" {
-		return Err("channel name must be a string length > 0")
+		return resp.Err("channel name must be a string length > 0")
 	}
-	Chans.unsubscribe(channel, c)
-	return resp.NewData(resp.Array, "unsubscribe", channel, int64(len(c.subscriptions)))
+	client.Chans.Unsubscribe(channel, c)
+	return resp.NewData(resp.Array, "unsubscribe", channel, int64(c.SubscriptionCount()))
 }
 
 func HandleCmdIncr(args []resp.Data) resp.Data {
 	if len(args) != 1 {
-		return WrongArgs("incr")
+		return resp.WrongArgs("incr")
 	}
 	key := args[0].Str
 	if key == "" {
-		return Err("key must be a string length > 0")
+		return resp.Err("key must be a string length > 0")
 	}
 	if entry := store.RDB.Get(key); entry != nil {
 		if i, err := strconv.Atoi(entry.Value); err == nil {
@@ -457,7 +370,7 @@ func HandleCmdIncr(args []resp.Data) resp.Data {
 			store.RDB.Set(key, strconv.Itoa(i), entry.ExpiryAt)
 			return resp.NewData(resp.Integer, int64(i))
 		} else {
-			return Err("value is not an integer or out of range")
+			return resp.Err("value is not an integer or out of range")
 		}
 	} else {
 		store.RDB.Set(key, "1", 0)
@@ -465,61 +378,99 @@ func HandleCmdIncr(args []resp.Data) resp.Data {
 	}
 }
 
-func HandleCmdACL(args []resp.Data) resp.Data {
+func HandleACL(args []resp.Data) resp.Data {
 	if len(args) == 0 {
-		return WrongArgs("acl")
+		return resp.WrongArgs("acl")
 	}
 
 	switch strings.ToLower(args[0].Str) {
 	case "whoami":
 		if len(args) != 1 {
-			return WrongArgs("acl|whoami")
+			return resp.WrongArgs("acl|whoami")
 		}
-		return ACL_WHOAMI()
+		return client.ACL_WHOAMI()
 
 	case "getuser":
 		if len(args) != 2 {
-			return WrongArgs("acl|getuser")
+			return resp.WrongArgs("acl|getuser")
 		}
 
 		if args[1].Type != resp.BulkString {
-			return Err("username must be a bulk string")
+			return resp.Err("username must be a bulk string")
 		}
 
-		return ACL_GETUSER(args[1].Str)
+		return client.ACL_GETUSER(args[1].Str)
 
 	case "setuser":
 		if len(args) != 3 {
-			return WrongArgs("acl|setuser")
+			return resp.WrongArgs("acl|setuser")
 		}
 
 		if args[1].Type != resp.BulkString {
-			return Err("username must be a bulk string")
+			return resp.Err("username must be a bulk string")
 		}
 
 		if args[2].Type != resp.BulkString {
-			return Err("rule must be a bulk string")
+			return resp.Err("rule must be a bulk string")
 		}
 
-		return ACL_SETUSER(args[1].Str, args[2].Str)
+		return client.ACL_SETUSER(args[1].Str, args[2].Str)
 
 	default:
-		return Err("unknown subcommand '" + args[0].Str + "'")
+		return resp.Err("unknown subcommand '" + args[0].Str + "'")
 	}
 }
 
-func HandleCmdAuth(c *Client, args []resp.Data) resp.Data {
+func HandleAuth(c *client.Client, args []resp.Data) resp.Data {
 	if len(args) != 2 {
-		return WrongArgs("auth")
+		return resp.WrongArgs("auth")
 	}
 
 	if args[0].Type != resp.BulkString {
-		return Err("username must be a bulk string")
+		return resp.Err("username must be a bulk string")
 	}
 
 	if args[1].Type != resp.BulkString {
-		return Err("password must be a bulk string")
+		return resp.Err("password must be a bulk string")
 	}
 
-	return Authenticate(c, args[0].Str, args[1].Str)
+	return client.Authenticate(c, args[0].Str, args[1].Str)
+}
+
+func HandleExec(c *client.Client) resp.Data {
+	if c.InMulti {
+		c.InMulti = false
+	} else {
+		return resp.Err("EXEC without MULTI")
+	}
+	queued := c.QueuedCmds
+	c.QueuedCmds = nil
+	respArr := make([]resp.Data, 0, len(queued))
+	for _, cmd := range queued {
+		res := HandleCmd(c, Command{cmd.Name, cmd.Args})
+		respArr = append(respArr, res)
+	}
+	return resp.NewData(resp.Array, respArr)
+}
+
+func HandleDiscard(c *client.Client) resp.Data {
+	if c.InMulti {
+		c.InMulti = false
+	} else {
+		return resp.Err("DISCARD without MULTI")
+	}
+	c.QueuedCmds = nil
+	return resp.NewData(resp.String, "OK")
+}
+
+func HandleWatch(c *client.Client, args []resp.Data) resp.Data {
+	if len(args) != 1 {
+		return resp.WrongArgs("watch")
+	}
+	if args[0].Type != resp.BulkString {
+		return resp.Err("key must be a bulkstring")
+	}
+	key := args[0].Str
+	store.RDB.WatchedKeys[key] = append(store.RDB.WatchedKeys[key], c)
+	return resp.NewData(resp.String, "OK")
 }
