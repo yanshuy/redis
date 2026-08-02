@@ -239,7 +239,7 @@ func HandleZrank(args []resp.Data) resp.Data {
 	if len(args) < 2 {
 		return resp.WrongArgs("ZADD")
 	}
-	if !args[0].Is(resp.BulkString) && !args[1].Is(resp.BulkString) {
+	if !args[0].Is(resp.BulkString) || !args[1].Is(resp.BulkString) {
 		return resp.Err("invalid argument type for 'ZADD'")
 	}
 	key := args[0].Str
@@ -259,6 +259,35 @@ func HandleZrank(args []resp.Data) resp.Data {
 	} else {
 		return resp.NewData(resp.Integer, rank)
 	}
+}
+
+func HandleZrange(args []resp.Data) resp.Data {
+	if len(args) < 3 {
+		return resp.WrongArgs("ZADD")
+	}
+	invalid := !args[0].Is(resp.BulkString) ||
+		!args[1].Is(resp.BulkString) || !args[2].Is(resp.BulkString)
+
+	key := args[0].Str
+	m, ok := store.RDB.Look(key)
+	if !ok {
+		return resp.NewData(resp.Array, []resp.Data{})
+	}
+	if m.Data.Type != store.ZSET {
+		return resp.Err(fmt.Sprintf("provided key '%s' holds some other data", key))
+	}
+
+	start, err := strconv.Atoi(args[1].Str)
+	end, err := strconv.Atoi(args[2].Str)
+	if err != nil {
+		invalid = true
+	}
+	if invalid {
+		return resp.Err("invalid argument type for 'ZADD'")
+	}
+
+	list := store.RDB.Zrange(key, start, end)
+	return resp.NewData(resp.Array, list)
 }
 
 func HandleType(args []resp.Data) resp.Data {

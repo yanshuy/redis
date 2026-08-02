@@ -173,6 +173,9 @@ func HandleCmd(c *client.Client, cmd Command) resp.Data {
 	case "zrank":
 		return HandleZrank(args)
 
+	case "zrange":
+		return HandleZrange(args)
+
 	case "type":
 		return HandleType(args)
 

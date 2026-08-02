@@ -67,6 +67,27 @@ func (s *Zset) insert(z Z) bool {
 	return !ok
 }
 
+func (rs *RedisStore) Zadd(key string, scores []float64, member []string) int {
+	m, _ := rs.Look(key)
+	if m == nil {
+		m = rs.NewStoreMember(key, ZSET)
+	}
+
+	z := m.Data.Zset
+
+	inserts := 0
+	for i := range scores {
+		score := scores[i]
+		member := member[i]
+		if z.insert(Z{member, score}) {
+			inserts++
+		}
+	}
+
+	rs.TouchWatchedKey(key)
+	return inserts
+}
+
 func (rs *RedisStore) Zrank(key, member string) (int, bool) {
 	m, _ := rs.Look(key)
 	z := m.Data.Zset
@@ -87,23 +108,24 @@ func (rs *RedisStore) Zrank(key, member string) (int, bool) {
 	return rank, true
 }
 
-func (rs *RedisStore) Zadd(key string, scores []float64, member []string) int {
+func (rs *RedisStore) Zrange(key string, start int, end int) []string {
 	m, _ := rs.Look(key)
-	if m == nil {
-		m = rs.NewStoreMember(key, ZSET)
-	}
-
 	z := m.Data.Zset
 
-	inserts := 0
-	for i := range scores {
-		score := scores[i]
-		member := member[i]
-		if z.insert(Z{member, score}) {
-			inserts++
-		}
+	if z.len() < start {
+		return []string{}
 	}
 
-	rs.TouchWatchedKey(key)
-	return inserts
+	cur := z.list.head.next
+	for range start {
+		cur = cur.next
+	}
+
+	list := make([]string, 0, end-start+1)
+	for i := start; cur != nil && i <= end; i++ {
+		list = append(list, cur.Z.member)
+		cur = cur.next
+	}
+
+	return list
 }
