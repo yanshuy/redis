@@ -124,6 +124,11 @@ func (c *Client) execute(req resp.Data) resp.Data {
 		return Err("invalid command")
 	}
 
+	if cmd.name == "quit" {
+		c.quit = true
+		return resp.NewData(resp.String, "OK")
+	}
+
 	if !c.isAuthenticated() {
 		switch cmd.name {
 		case "auth", "hello", "ping":
@@ -142,38 +147,24 @@ func (c *Client) HandleCmd(cmd Command) resp.Data {
 		switch cmd.name {
 		case "ping":
 			return resp.NewData(resp.Array, "pong", "")
-		case "subscribe", "unsubscribe", "quit":
+		case "subscribe", "unsubscribe":
 		default:
 			return Err(fmt.Sprintf("Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", cmd.name))
 		}
 	}
 
-	if cmd.name == "exec" {
-		if c.inMulti {
-			c.inMulti = false
-		} else {
-			return Err("EXEC without MULTI")
-		}
-		respArr := make([]resp.Data, 0, len(c.queuedCmds))
-		for _, cmd := range c.queuedCmds {
-			resp := c.HandleCmd(cmd)
-			respArr = append(respArr, resp)
-		}
-		return resp.NewData(resp.Array, respArr)
-	}
-
 	if c.inMulti {
-		c.queuedCmds = append(c.queuedCmds, cmd)
-		return resp.NewData(resp.String, "QUEUED")
+		switch cmd.name {
+		case "exec", "discard":
+		default:
+			c.queuedCmds = append(c.queuedCmds, cmd)
+			return resp.NewData(resp.String, "QUEUED")
+		}
 	}
 
 	switch cmd.name {
 	case "ping":
 		return resp.NewData(resp.String, "PONG")
-
-	case "quit":
-		c.quit = true
-		return resp.NewData(resp.String, "OK")
 
 	case "echo":
 		if len(args) != 1 {
@@ -251,6 +242,29 @@ func (c *Client) HandleCmd(cmd Command) resp.Data {
 
 	case "multi":
 		c.inMulti = true
+		return resp.NewData(resp.String, "OK")
+
+	case "exec":
+		if c.inMulti {
+			c.inMulti = false
+		} else {
+			return Err("EXEC without MULTI")
+		}
+		respArr := make([]resp.Data, 0, len(c.queuedCmds))
+		for _, cmd := range c.queuedCmds {
+			resp := c.HandleCmd(cmd)
+			respArr = append(respArr, resp)
+		}
+		c.queuedCmds = nil
+		return resp.NewData(resp.Array, respArr)
+
+	case "discard":
+		if c.inMulti {
+			c.inMulti = false
+		} else {
+			return Err("DISCARD without MULTI")
+		}
+		c.queuedCmds = nil
 		return resp.NewData(resp.String, "OK")
 
 	default:
