@@ -493,6 +493,7 @@ func HandleUnWatch(c *client.Client) resp.Data {
 		}
 	}
 	c.WatchKeys = nil
+	c.CASDirty = false
 	return resp.NewData(resp.String, "OK")
 }
 
