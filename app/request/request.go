@@ -101,7 +101,7 @@ func execute(c *client.Client, req resp.Data) resp.Data {
 
 	if c.InMulti {
 		switch cmd.name {
-		case "exec", "discard":
+		case "exec", "discard", "watch":
 		default:
 			c.QueuedCmds = append(c.QueuedCmds, client.Command{
 				Name: cmd.name,
