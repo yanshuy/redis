@@ -149,7 +149,7 @@ func (rs *RedisStore) Zscore(key string, member string) float64 {
 	m, _ := rs.Look(key)
 	z := m.Data.Zset
 
-	cur := z.list.head
+	cur := z.list.head.next
 	for cur != nil {
 		if cur.member == member {
 			break
@@ -157,4 +157,20 @@ func (rs *RedisStore) Zscore(key string, member string) float64 {
 		cur = cur.next
 	}
 	return cur.score
+}
+
+func (rs *RedisStore) Zrem(key string, member string) int {
+	m, _ := rs.Look(key)
+	z := m.Data.Zset
+
+	cur := z.list.head
+	for cur.next != nil {
+		if cur.next.member == member {
+			cur.next = cur.next.next
+			delete(z.dict, member)
+			return 1
+		}
+		cur = cur.next
+	}
+	return 0
 }

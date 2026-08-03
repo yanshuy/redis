@@ -315,6 +315,21 @@ func HandleZscore(args []resp.Data) resp.Data {
 	return resp.NewData(resp.BulkString, strconv.FormatFloat(score, 'g', -1, 64))
 }
 
+func HandleZrem(args []resp.Data) resp.Data {
+	if len(args) != 2 {
+		return resp.WrongArgs("ZCARD")
+	}
+	key := args[0].Str
+	m, ok := store.RDB.Look(key)
+	if !ok || m.Data.Type != store.ZSET {
+		return resp.NewData(resp.Integer, 0)
+	}
+	member := args[1].Str
+
+	removed := store.RDB.Zrem(key, member)
+	return resp.NewData(resp.Integer, removed)
+}
+
 func HandleType(args []resp.Data) resp.Data {
 	if len(args) != 1 {
 		return resp.WrongArgs("type")
