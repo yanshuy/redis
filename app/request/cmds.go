@@ -290,6 +290,16 @@ func HandleZrange(args []resp.Data) resp.Data {
 	return resp.NewData(resp.Array, list)
 }
 
+func HandleZcard(args []resp.Data) resp.Data {
+	if len(args) != 1 {
+		return resp.WrongArgs("ZCARD")
+	}
+	key := args[0].Str
+
+	card := store.RDB.Zcard(key)
+	return resp.NewData(resp.Integer, card)
+}
+
 func HandleType(args []resp.Data) resp.Data {
 	if len(args) != 1 {
 		return resp.WrongArgs("type")

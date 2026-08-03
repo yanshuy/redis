@@ -113,7 +113,6 @@ func (rs *RedisStore) Zrange(key string, start int, end int) []string {
 	z := m.Data.Zset
 
 	n := z.len()
-
 	if start < 0 {
 		start = max(n+start, 0)
 	}
@@ -136,4 +135,12 @@ func (rs *RedisStore) Zrange(key string, start int, end int) []string {
 	}
 
 	return list
+}
+
+func (rs *RedisStore) Zcard(key string) int {
+	m, ok := rs.Look(key)
+	if !ok || m.Data.Type != ZSET {
+		return 0
+	}
+	return m.Data.Zset.len()
 }
