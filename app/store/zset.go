@@ -144,3 +144,17 @@ func (rs *RedisStore) Zcard(key string) int {
 	}
 	return m.Data.Zset.len()
 }
+
+func (rs *RedisStore) Zscore(key string, member string) float64 {
+	m, _ := rs.Look(key)
+	z := m.Data.Zset
+
+	cur := z.list.head
+	for cur != nil {
+		if cur.member == member {
+			break
+		}
+		cur = cur.next
+	}
+	return cur.score
+}
