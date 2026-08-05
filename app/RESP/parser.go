@@ -10,21 +10,18 @@ var CRLF = []byte("\r\n")
 
 // returns (value, consumedBytes, error).
 // If data is incomplete, returns (zeroValue, 0, nil).
-func Parse(b []byte) (r []Data, n int, err error) {
+func Parse(b []byte) (r Data, n int, err error) {
 	if len(b) == 0 {
 		return r, 0, nil
 	}
 
-	for n < len(b) {
-		d, o, err := R(b[n:])
-		if err != nil {
-			return r, 0, err
-		}
-		n += o
-		r = append(r, d)
+	d, o, err := R(b[n:])
+	if err != nil {
+		return r, 0, err
 	}
+	n += o
 
-	return r, n, nil
+	return d, n, nil
 }
 
 func R(b []byte) (d Data, n int, err error) {

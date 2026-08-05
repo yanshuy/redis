@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 
+	"github.com/codecrafters-io/redis-starter-go/app/client"
 	"github.com/codecrafters-io/redis-starter-go/app/request"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
@@ -17,12 +18,15 @@ var (
 
 func main() {
 	flag.Parse()
-	store.RDB.InitConfig("dir", *dirFlag, "dbfilename", *dbFileFlag)
+	config := store.NewConfig("dir", *dirFlag, "dbfilename", *dbFileFlag)
 
-	err := store.RDB.RestoreRDBSnapshot()
+	store, err := store.InitializeStore(config)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	reqChan := make(chan request.Request)
+	go CommandLoop(store, reqChan)
 
 	l, err := net.Listen("tcp", "0.0.0.0:6379")
 	if err != nil {
@@ -35,15 +39,23 @@ func main() {
 			fmt.Println("Error accepting connection: ", err.Error())
 			continue
 		}
-		go handleConnection(conn)
+		go handleConnection(conn, reqChan)
 	}
 }
 
-func handleConnection(conn net.Conn) {
+func CommandLoop(store *store.RedisStore, reqChan chan request.Request) {
+	for req := range reqChan {
+		request.HandleRequest(store, req)
+	}
+}
+
+func handleConnection(conn net.Conn, reqChan chan<- request.Request) {
 	defer conn.Close()
 
-	n, err := request.ReadAndHandleRequest(conn)
+	c := client.NewClient(conn)
+	go c.WriteLoop()
+	err := request.ReadRequests(c, reqChan)
 	if err != nil {
-		log.Println("error reading", err, "\nbytes read", n)
+		log.Println("error reading", err)
 	}
 }

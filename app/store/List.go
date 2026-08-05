@@ -1,138 +1,130 @@
 package store
 
 import (
-	"fmt"
-	"math"
 	"slices"
-	"time"
 )
 
-func (rs *RedisStore) Rpush(key string, val []string) (int, error) {
-	var mem *Value
-	if m, ok := rs.Look(key); ok {
-		if m.Data.Type != LIST {
-			return 0, fmt.Errorf("provided key '%s' holds some other data", key)
-		}
-		mem = m
-		mem.Data.List = append(mem.Data.List, val...)
-	} else {
-		mem = rs.NewStoreMember(key, LIST)
-		mem.Data.List = append(mem.Data.List, val...)
+func (rs *RedisStore) NotifyBlockedClient(key string, values []string) []string {
+	blocked := rs.BlockedKeys[key]
+	if len(blocked) == 0 {
+		return values
 	}
-	go rs.NotifyListener(key)
-	rs.TouchWatchedKey(key)
-	return len(mem.Data.List), nil
+
+	n := min(len(values), len(blocked))
+
+	clients := blocked[:n]
+	rs.BlockedKeys[key] = blocked[n:]
+
+	for i, ch := range clients {
+		ch <- BlockResult{Key: key, Value: values[i]}
+	}
+	return values[n:]
 }
 
-func (rs *RedisStore) Lpush(key string, val []string) (int, error) {
-	var mem *Value
-	if m, ok := rs.Look(key); ok {
-		if m.Data.Type != LIST {
-			return 0, fmt.Errorf("provided key '%s' does not hold a list", key)
-		}
-		mem = m
-		slices.Reverse(val)
-		m.Data.List = append(val, m.Data.List...)
-	} else {
-		mem = rs.NewStoreMember(key, LIST)
-		mem.Data.List = append(mem.Data.List, val...)
+func (rs *RedisStore) Rpush(key string, elements []string) (int, error) {
+	val, ok := rs.Look(key)
+	if !ok {
+		val = NewValue(LIST, 0)
+		rs.Store[key] = val
 	}
-	go rs.NotifyListener(key)
+	list, err := As[List](val)
+	if err != nil {
+		return 0, err
+	}
+
+	totalLen := len(list) + len(elements)
+	elements = rs.NotifyBlockedClient(key, elements)
+
+	if len(elements) > 0 {
+		list = append(list, elements...)
+		val.Obj = list
+	}
+
 	rs.TouchWatchedKey(key)
-	return len(mem.Data.List), nil
+	return totalLen, nil
+}
+
+func (rs *RedisStore) Lpush(key string, elements []string) (int, error) {
+	val, ok := rs.Look(key)
+	if !ok {
+		val = NewValue(LIST, 0)
+		rs.Store[key] = val
+	}
+	list, err := As[List](val)
+	if err != nil {
+		return 0, err
+	}
+
+	totalLen := len(list) + len(elements)
+	elements = rs.NotifyBlockedClient(key, elements)
+
+	if len(elements) > 0 {
+		slices.Reverse(elements)
+		list = append(elements, list...)
+		val.Obj = list
+	}
+
+	rs.TouchWatchedKey(key)
+	return totalLen, nil
 }
 
 func (rs *RedisStore) Lpop(key string, popCount int) ([]string, error) {
-	if m, ok := rs.Look(key); ok {
-		if m.Data.Type != LIST {
-			return nil, fmt.Errorf("provided key '%s' does not hold a list", key)
-		}
-		if popCount > len(m.Data.List) {
-			popCount = len(m.Data.List)
-		}
-		popped := make([]string, 0, popCount)
-		for _, item := range m.Data.List[:popCount] {
-			popped = append(popped, item)
-		}
-		m.Data.List = m.Data.List[popCount:]
-		rs.TouchWatchedKey(key)
-		return popped, nil
-	} else {
+	val, ok := rs.Look(key)
+	if !ok {
 		return nil, nil
 	}
-}
-
-func (rs *RedisStore) Llen(key string) (int, error) {
-	if m, ok := rs.Look(key); ok {
-		if m.Data.Type != LIST {
-			return 0, fmt.Errorf("provided key '%s' does not hold a LIST", key)
-		}
-		return len(m.Data.List), nil
-	} else {
-		return 0, nil
-	}
-}
-
-func (rs *RedisStore) Lrange(key string, startIdx int, endIdx int) ([]string, error) {
-	if m, ok := rs.Look(key); ok {
-		if m.Data.Type != LIST {
-			return nil, fmt.Errorf("provided key '%s' holds some other data", key)
-		}
-		if startIdx < 0 {
-			startIdx = max(len(m.Data.List)+startIdx, 0)
-		}
-		if endIdx < 0 {
-			endIdx = max(len(m.Data.List)+endIdx, 0)
-		}
-		if startIdx > endIdx || startIdx > len(m.Data.List) {
-			return []string{}, nil
-		}
-		if endIdx >= len(m.Data.List) {
-			endIdx = len(m.Data.List) - 1
-		}
-		items := make([]string, 0, endIdx-startIdx)
-		for i := startIdx; i < endIdx+1; i++ {
-			items = append(items, m.Data.List[i])
-		}
-		return items, nil
-
-	} else {
-		return []string{}, nil
-	}
-}
-
-func (rs *RedisStore) Blpop(key string, timeout_s float64) (<-chan string, error) {
-	item, err := rs.Lpop(key, 1)
+	list, err := As[List](val)
 	if err != nil {
 		return nil, err
 	}
 
-	msgChan := make(chan string, 1)
+	if popCount > len(list) {
+		popCount = len(list)
+	}
+	popped := list[:popCount]
 
-	if len(item) == 1 {
-		msgChan <- item[0]
-		close(msgChan)
-		return msgChan, nil
+	list = list[popCount:]
+	val.Obj = list
+
+	return popped, nil
+}
+
+func (rs *RedisStore) Llen(key string) (int, error) {
+	val, ok := rs.Look(key)
+	if !ok {
+		return 0, nil
+	}
+	list, err := As[List](val)
+	if err != nil {
+		return 0, err
 	}
 
-	if timeout_s <= 0 {
-		timeout_s = math.MaxInt32
+	return len(list), nil
+}
+
+func (rs *RedisStore) Lrange(key string, startIdx int, endIdx int) ([]string, error) {
+	val, ok := rs.Look(key)
+	if !ok {
+		return []string{}, nil
+	}
+	list, err := As[List](val)
+	if err != nil {
+		return nil, err
 	}
 
-	timer := time.NewTimer(time.Duration(timeout_s * float64(time.Second)))
-	ch := rs.subscribe(key)
+	n := len(list)
+	if startIdx < 0 {
+		startIdx = max(n+startIdx, 0)
+	}
+	if endIdx < 0 {
+		endIdx = max(n+endIdx, 0)
+	}
+	if startIdx > endIdx || startIdx >= len(list) {
+		return []string{}, nil
+	}
+	if endIdx >= len(list) {
+		endIdx = len(list) - 1
+	}
 
-	go func() {
-		defer timer.Stop()
-		select {
-		case <-ch:
-			item, _ := rs.Lpop(key, 1)
-			msgChan <- item[0]
-		case <-timer.C:
-			msgChan <- ""
-		}
-		close(msgChan)
-		rs.unsubscribe(key, ch)
-	}()
-	return msgChan, nil
+	return list[startIdx : endIdx+1], nil
 }

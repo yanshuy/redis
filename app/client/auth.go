@@ -3,7 +3,6 @@ package client
 import (
 	"crypto/sha256"
 	"fmt"
-	"io"
 	"strings"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
@@ -27,7 +26,6 @@ func (u *User) ToRESP() resp.Data {
 	passwords_v := resp.NewData(resp.Array, passStrs)
 
 	res := []resp.Data{flags, flags_v, passwords, passwords_v}
-	fmt.Printf("%+v\n", resp.NewData(resp.Array, res))
 	return resp.NewData(resp.Array, res)
 }
 
@@ -39,20 +37,6 @@ var DefaultUser = &User{
 
 var users = map[string]*User{
 	"default": DefaultUser,
-}
-
-func NewClient(conn io.WriteCloser) *Client {
-	var user *User
-	if DefaultUser.flags.Contains("nopass") {
-		user = DefaultUser
-	}
-	doneChan := make(chan struct{})
-
-	return &Client{
-		conn:       conn,
-		authAsUser: user,
-		done:       doneChan,
-	}
 }
 
 var currentUser = "default"
@@ -97,4 +81,37 @@ func Authenticate(c *Client, username string, password string) resp.Data {
 	} else {
 		return resp.Err("User does not exist.")
 	}
+}
+
+type Set[T comparable] map[T]struct{}
+
+func NewSet[T comparable](items ...T) Set[T] {
+	s := make(Set[T])
+	s.Add(items...)
+	return s
+}
+
+func (s Set[T]) Add(items ...T) {
+	for _, item := range items {
+		s[item] = struct{}{}
+	}
+}
+
+func (s Set[T]) Remove(items ...T) {
+	for _, item := range items {
+		delete(s, item)
+	}
+}
+
+func (s Set[T]) Contains(item T) bool {
+	_, ok := s[item]
+	return ok
+}
+
+func (s Set[T]) ToSlice() []T {
+	result := make([]T, 0, len(s))
+	for item := range s {
+		result = append(result, item)
+	}
+	return result
 }

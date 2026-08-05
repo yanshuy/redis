@@ -67,13 +67,16 @@ func (s *Zset) insert(z Z) bool {
 	return !ok
 }
 
-func (rs *RedisStore) Zadd(key string, scores []float64, member []string) int {
-	m, _ := rs.Look(key)
-	if m == nil {
-		m = rs.NewStoreMember(key, ZSET)
+func (rs *RedisStore) Zadd(key string, scores []float64, member []string) (int, error) {
+	val, ok := rs.Look(key)
+	if !ok {
+		val = NewValue(ZSET, 0)
+		rs.Store[key] = val
 	}
-
-	z := m.Data.Zset
+	z, err := As[Zset](val)
+	if err != nil {
+		return 0, err
+	}
 
 	inserts := 0
 	for i := range scores {
@@ -85,42 +88,60 @@ func (rs *RedisStore) Zadd(key string, scores []float64, member []string) int {
 	}
 
 	rs.TouchWatchedKey(key)
-	return inserts
+	return inserts, nil
 }
 
-func (rs *RedisStore) Zrank(key, member string) (int, bool) {
-	m, _ := rs.Look(key)
-	z := m.Data.Zset
-
+func (rs *RedisStore) Zrank(key, member string) (int, bool, error) {
+	val, ok := rs.Look(key)
+	if !ok {
+		return 0, false, nil
+	}
+	z, err := As[Zset](val)
+	if err != nil {
+		return 0, false, err
+	}
 	if _, ok := z.dict[member]; !ok {
-		return 0, false
+		return 0, false, nil
 	}
 
-	rank := -1
-	cur := z.list.head
+	rank := 0
+	cur := z.list.head.next
 	for cur != nil {
 		if cur.member == member {
-			break
+			return rank, true, nil
 		}
 		rank++
 		cur = cur.next
 	}
-	return rank, true
+
+	return 0, false, nil
 }
 
-func (rs *RedisStore) Zrange(key string, start int, end int) []string {
-	m, _ := rs.Look(key)
-	z := m.Data.Zset
+func (rs *RedisStore) Zrange(key string, start int, end int) ([]string, error) {
+	val, ok := rs.Look(key)
+	if !ok {
+		return []string{}, nil
+	}
+	z, err := As[Zset](val)
+	if err != nil {
+		return nil, err
+	}
 
 	n := z.len()
+	if n == 0 {
+		return []string{}, nil
+	}
 	if start < 0 {
 		start = max(n+start, 0)
 	}
 	if end < 0 {
 		end = max(n+end, 0)
 	}
-	if n < start || start > end {
-		return []string{}
+	if start >= n || start > end {
+		return []string{}, nil
+	}
+	if end >= n {
+		end = n - 1
 	}
 
 	cur := z.list.head.next
@@ -134,43 +155,56 @@ func (rs *RedisStore) Zrange(key string, start int, end int) []string {
 		cur = cur.next
 	}
 
-	return list
+	return list, nil
 }
 
-func (rs *RedisStore) Zcard(key string) int {
-	m, ok := rs.Look(key)
-	if !ok || m.Data.Type != ZSET {
-		return 0
+func (rs *RedisStore) Zcard(key string) (int, error) {
+	val, ok := rs.Look(key)
+	if !ok {
+		return 0, nil
 	}
-	return m.Data.Zset.len()
+	z, err := As[Zset](val)
+	if err != nil {
+		return 0, err
+	}
+
+	return z.len(), nil
 }
 
-func (rs *RedisStore) Zscore(key string, member string) float64 {
-	m, _ := rs.Look(key)
-	z := m.Data.Zset
-
-	cur := z.list.head.next
-	for cur != nil {
-		if cur.member == member {
-			break
-		}
-		cur = cur.next
+func (rs *RedisStore) Zscore(key, member string) (float64, bool, error) {
+	val, ok := rs.Look(key)
+	if !ok {
+		return 0, false, nil
 	}
-	return cur.score
+	z, err := As[Zset](val)
+	if err != nil {
+		return 0, false, err
+	}
+
+	v, ok := z.dict[member]
+	if !ok {
+		return 0, false, nil
+	}
+	return v.score, true, nil
 }
 
-func (rs *RedisStore) Zrem(key string, member string) int {
-	m, _ := rs.Look(key)
-	z := m.Data.Zset
-
-	cur := z.list.head
-	for cur.next != nil {
-		if cur.next.member == member {
-			cur.next = cur.next.next
-			delete(z.dict, member)
-			return 1
-		}
-		cur = cur.next
+func (rs *RedisStore) Zrem(key, member string) (int, error) {
+	val, ok := rs.Look(key)
+	if !ok {
+		return 0, nil
 	}
-	return 0
+	z, err := As[Zset](val)
+	if err != nil {
+		return 0, err
+	}
+
+	v, ok := z.dict[member]
+	if !ok {
+		return 0, nil
+	}
+	z.remove(v)
+	delete(z.dict, member)
+
+	rs.TouchWatchedKey(key)
+	return 1, nil
 }

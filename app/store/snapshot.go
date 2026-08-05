@@ -8,7 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -24,27 +24,32 @@ const (
 	REDIS_VERSION = "0011"
 )
 
-func (rs *RedisStore) GetRDBFile(flag int) *os.File {
+func (rs *RedisStore) GetRDBFile(flag int) (*os.File, error) {
 	dir := rs.Config["dir"]
-	// cwd, _ := os.Getwd()
-	// if !filepath.IsAbs(dir) {
-	// 	dir = filepath.Join(cwd, dir)
-	// }
+	if dir == "" {
+		dir = "."
+	}
 	err := os.MkdirAll(dir, 0o755)
 	if err != nil {
-		log.Fatalf("mkdir %s: %v", dir, err)
+		return nil, fmt.Errorf("mkdir %s: %v", dir, err)
 	}
-	filePath := path.Join(dir, rs.Config["dbfilename"])
-	fmt.Println(filePath)
+	dbfilename := rs.Config["dbfilename"]
+	if dbfilename == "" {
+		dbfilename = "dump.rdb"
+	}
+	filePath := filepath.Join(dir, dbfilename)
 	file, err := os.OpenFile(filePath, flag, os.ModePerm)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	return file
+	return file, nil
 }
 
-func (rs *RedisStore) SaveRDBSnapshot() (err error) {
-	file := rs.GetRDBFile(os.O_CREATE | os.O_WRONLY | os.O_TRUNC)
+func SaveRDBSnapshot(rs *RedisStore) (err error) {
+	file, err := rs.GetRDBFile(os.O_CREATE | os.O_WRONLY | os.O_TRUNC)
+	if err != nil {
+		return err
+	}
 	defer file.Close()
 
 	w := bufio.NewWriter(file)
@@ -107,7 +112,7 @@ func (rs *RedisStore) SaveRDBSnapshot() (err error) {
 		if value.ExpiryAt > 0 && value.ExpiryAt <= nowMs {
 			continue
 		}
-		if value.Data.Type != STRING {
+		if value.Type != STRING {
 			log.Println("ignoring type other than string")
 			continue
 		}
@@ -131,7 +136,7 @@ func (rs *RedisStore) SaveRDBSnapshot() (err error) {
 		if err != nil {
 			return err
 		}
-		err = writeEncodedString(w, value.Data.String)
+		err = writeEncodedString(w, value.Obj.(string))
 		if err != nil {
 			return err
 		}
@@ -226,8 +231,11 @@ const (
 	keyVals  = 3
 )
 
-func (rs *RedisStore) RestoreRDBSnapshot() (err error) {
-	file := rs.GetRDBFile(os.O_RDONLY | os.O_CREATE)
+func RestoreRDBSnapshot(rs *RedisStore) (err error) {
+	file, err := rs.GetRDBFile(os.O_RDONLY | os.O_CREATE)
+	if err != nil {
+		return nil
+	}
 	defer file.Close()
 
 	fi, err := file.Stat()
@@ -360,10 +368,8 @@ func (rs *RedisStore) RestoreRDBSnapshot() (err error) {
 					i += vLen
 
 					rs.Store[string(keyBytes)] = &Value{
-						Data: Obj{
-							Type:   STRING,
-							String: string(valBytes),
-						},
+						Type:     STRING,
+						Obj:      string(valBytes),
 						ExpiryAt: int64(expiry),
 					}
 					fmt.Println(rs.Store[string(keyBytes)])

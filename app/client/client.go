@@ -8,19 +8,73 @@ import (
 
 type Command struct {
 	Name string
-	Args []resp.Data
+	Args []string
 }
 
 type Client struct {
-	conn          io.WriteCloser
-	subscriptions map[string]chan string
-	authAsUser    *User
-	InMulti       bool
-	QueuedCmds    []Command
-	WatchKeys     []string
-	CASDirty      bool
-	done          chan struct{}
-	Quit          bool
+	Conn       io.ReadWriteCloser
+	authAsUser *User
+
+	subscriptions Set[string]
+	messageChan   chan PubMessage
+
+	InMulti      bool
+	QueuedCmds   []Command
+	WatchingKeys Set[string]
+	CASDirty     bool
+
+	Blocked  bool
+	Unblock  chan struct{}
+	RespChan chan resp.Data
+}
+
+func NewClient(conn io.ReadWriteCloser) *Client {
+	var user *User
+	if DefaultUser.flags.Contains("nopass") {
+		user = DefaultUser
+	}
+
+	c := &Client{
+		Conn:          conn,
+		authAsUser:    user,
+		subscriptions: make(Set[string]),
+		WatchingKeys:  make(Set[string]),
+		messageChan:   make(chan PubMessage, 100),
+		RespChan:      make(chan resp.Data, 100),
+	}
+	go c.ListenMessages()
+	return c
+}
+
+func (c *Client) Close() error {
+	for channel := range c.subscriptions {
+		Chans.Unsubscribe(c, channel)
+	}
+	// close(c.done)
+	close(c.RespChan)
+	return c.Conn.Close()
+}
+
+func (c *Client) WriteLoop() error {
+	for resp := range c.RespChan {
+		resBytes := resp.ToResponse()
+		_, err := c.Conn.Write(resBytes)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Client) Block() {
+	c.Blocked = true
+	c.Unblock = make(chan struct{})
+}
+
+func (c *Client) UnBlock() {
+	c.Unblock <- struct{}{}
+	c.Blocked = false
+	close(c.Unblock)
 }
 
 func (c *Client) InSubscribeMode() bool {
@@ -32,53 +86,9 @@ func (c *Client) SubscriptionCount() int {
 }
 
 func (c *Client) InWatch() bool {
-	return len(c.WatchKeys) > 0
-}
-
-func (c *Client) Write(b []byte) (int, error) {
-	return c.conn.Write(b)
-}
-
-func (c *Client) Close() error {
-	for channel := range c.subscriptions {
-		Chans.Unsubscribe(channel, c)
-	}
-	return c.conn.Close()
+	return len(c.WatchingKeys) > 0
 }
 
 func (c *Client) IsAuthenticated() bool {
 	return c.authAsUser != nil
-}
-
-type Set[T comparable] map[T]struct{}
-
-func NewSet[T comparable](items ...T) Set[T] {
-	s := make(Set[T])
-	s.Add(items...)
-	return s
-}
-
-func (s Set[T]) Add(items ...T) {
-	for _, item := range items {
-		s[item] = struct{}{}
-	}
-}
-
-func (s Set[T]) Remove(items ...T) {
-	for _, item := range items {
-		delete(s, item)
-	}
-}
-
-func (s Set[T]) Contains(item T) bool {
-	_, ok := s[item]
-	return ok
-}
-
-func (s Set[T]) ToSlice() []T {
-	result := make([]T, 0, len(s))
-	for item := range s {
-		result = append(result, item)
-	}
-	return result
 }

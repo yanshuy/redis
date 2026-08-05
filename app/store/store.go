@@ -1,6 +1,8 @@
 package store
 
 import (
+	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -8,41 +10,34 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/client"
 )
 
-type Value struct {
-	ExpiryAt int64
-	Data     Obj
-}
+type Config = map[string]string
 
-func (rs *RedisStore) NewStoreMember(key string, t ObjType) *Value {
-	m := &Value{
-		Data: Obj{Type: t},
-	}
-	if t == ZSET {
-		m.Data.Zset = NewZset()
-	}
-	rs.Store[key] = m
-	return m
+type BlockResult struct {
+	Key   string
+	Value string
 }
 
 type RedisStore struct {
 	Config      map[string]string
 	Store       map[string]*Value
-	Listeners   map[string][]chan struct{}
+	BlockedKeys map[string][]chan BlockResult
 	WatchedKeys map[string][]*client.Client
 	mu          sync.Mutex
 }
 
-func (rs *RedisStore) Look(key string) (*Value, bool) {
-	m, ok := rs.Store[key]
-	return m, ok
-}
-
-var RDB RedisStore = RedisStore{
-	Store:       make(map[string]*Value),
-	Config:      make(map[string]string),
-	Listeners:   make(map[string][]chan struct{}),
-	WatchedKeys: make(map[string][]*client.Client),
-	mu:          sync.Mutex{},
+func InitializeStore(config Config) (*RedisStore, error) {
+	store := &RedisStore{
+		Store:       make(map[string]*Value),
+		Config:      config,
+		BlockedKeys: make(map[string][]chan BlockResult),
+		WatchedKeys: make(map[string][]*client.Client),
+		mu:          sync.Mutex{},
+	}
+	err := RestoreRDBSnapshot(store)
+	if err != nil {
+		return nil, err
+	}
+	return store, nil
 }
 
 type ObjType int
@@ -54,17 +49,15 @@ const (
 	ZSET
 )
 
-type Obj struct {
-	Type   ObjType
-	String string
-	Stream *Stream
-	List   []string
-	Zset   Zset
+type Value struct {
+	ExpiryAt int64
+	Type     ObjType
+	Obj      any
 }
 
 func (rs *RedisStore) Type(key string) string {
 	if m, ok := rs.Look(key); ok {
-		switch m.Data.Type {
+		switch m.Type {
 		case STRING:
 			return "string"
 		case LIST:
@@ -78,6 +71,41 @@ func (rs *RedisStore) Type(key string) string {
 	return "none"
 }
 
+func NewValue(t ObjType, expiryAt int64) *Value {
+	var obj any
+	switch t {
+	case STRING:
+		obj = ""
+	case LIST:
+		obj = []string{}
+	case STREAM:
+		obj = Stream{}
+	case ZSET:
+		obj = NewZset()
+	default:
+		panic(fmt.Sprintf("unexpected store.ObjType: %#v", t))
+	}
+	return &Value{ExpiryAt: expiryAt, Type: t, Obj: obj}
+}
+
+type List = []string
+type RedisValue interface {
+	~string | List | Stream | Zset
+}
+
+func As[T RedisValue](val *Value) (T, error) {
+	v, ok := val.Obj.(T)
+	if !ok {
+		return v, fmt.Errorf("expected %T, got %T", *new(T), val.Obj)
+	}
+	return v, nil
+}
+
+func (rs *RedisStore) Look(key string) (*Value, bool) {
+	m, ok := rs.Store[key]
+	return m, ok
+}
+
 func (rs *RedisStore) RemoveMemberAfter(ttl_ms int64, key string) {
 	timer := time.NewTimer(time.Duration(ttl_ms) * time.Millisecond)
 	<-timer.C
@@ -85,36 +113,32 @@ func (rs *RedisStore) RemoveMemberAfter(ttl_ms int64, key string) {
 }
 
 func (rs *RedisStore) Set(key string, val string, ttl_ms int64) {
-	mem := rs.NewStoreMember(key, STRING)
-	mem.Data.String = val
+	var expiryAt int64
 	if ttl_ms > 0 {
-		mem.ExpiryAt = time.Now().UnixMilli() + ttl_ms
+		expiryAt = time.Now().UnixMilli() + ttl_ms
 		go rs.RemoveMemberAfter(ttl_ms, key)
 	}
+	obj := NewValue(STRING, expiryAt)
+	obj.Obj = val
+	rs.Store[key] = obj
+
 	rs.TouchWatchedKey(key)
 }
 
-type Entry struct {
-	Value    string
-	ExpiryAt int64
-}
-
-func (rs *RedisStore) Get(key string) *Entry {
-	mem, ok := rs.Store[key]
+func (rs *RedisStore) Get(key string) string {
+	val, ok := rs.Store[key]
 	if !ok {
-		return nil
+		return ""
 	}
-	if mem.ExpiryAt > 0 && mem.ExpiryAt <= time.Now().UnixMilli() {
+	if val.ExpiryAt > 0 && val.ExpiryAt <= time.Now().UnixMilli() {
 		delete(rs.Store, key)
-		return nil
+		return ""
 	}
-	if mem.Data.Type != STRING {
-		return nil
+	str, err := As[string](val)
+	if err != nil {
+		return ""
 	}
-	return &Entry{
-		Value:    mem.Data.String,
-		ExpiryAt: mem.ExpiryAt,
-	}
+	return str
 }
 
 func (rs *RedisStore) Keys(pattern string) []string {
@@ -135,60 +159,29 @@ func (rs *RedisStore) TouchWatchedKey(key string) {
 	}
 }
 
-func (rs *RedisStore) subscribe(key string) chan struct{} {
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
-	ch := make(chan struct{})
-	rs.Listeners[key] = append(rs.Listeners[key], ch)
-	return ch
+// requires even arguments, of key value pair
+func NewConfig(configs ...string) Config {
+	config := make(Config)
+	if len(configs)%2 != 0 {
+		log.Fatal("init config: requrie even arguments, of key value pair")
+	}
+	for i := 0; i < len(configs); i += 2 {
+		key := configs[i]
+		val := configs[i+1]
+		config[key] = val
+	}
+	return config
 }
 
-func (rs *RedisStore) unsubscribe(key string, ch chan struct{}) (ok bool) {
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
-
-	chans, ok := rs.Listeners[key]
-	if !ok {
-		return false
-	}
-
-	for i, c := range chans {
-		if c == ch {
-			chans = append(chans[:i], chans[i+1:]...)
-			ok = true
+func (rs *RedisStore) ConfigGet(args []string) ([]string, error) {
+	result := make([]string, 0, len(args)*2)
+	for _, arg := range args {
+		val, ok := rs.Config[arg]
+		if !ok {
+			return nil, fmt.Errorf("unknown config %s", arg)
 		}
+		result = append(result, arg)
+		result = append(result, val)
 	}
-
-	if len(chans) == 0 {
-		delete(rs.Listeners, key)
-	}
-	close(ch)
-	return ok
-}
-
-// func (rs *RedisStore) notifySubscribers(key string, events ...func()) {
-// 	chans, ok := rs.Listeners[key]
-// 	if !ok {
-// 		return
-// 	}
-// 	for _, event := range events {
-// 		event()
-// 	}
-// 	for _, c := range chans {
-// 		c <- struct{}{}
-// 	}
-// }
-
-func (rs *RedisStore) NotifyListener(key string) {
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
-
-	chans, ok := rs.Listeners[key]
-	if !ok {
-		return
-	}
-	ch := chans[0]
-	rs.Listeners[key] = chans[1:]
-
-	ch <- struct{}{}
+	return result, nil
 }

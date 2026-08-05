@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	Async          byte = 0
 	Error          byte = '-'
 	String         byte = '+'
 	Integer        byte = ':'
@@ -180,6 +181,10 @@ func (d *Data) ToResponse() []byte {
 		log.Fatal("unknown data type encountered")
 		return []byte{}
 	}
+}
+
+func Future() Data {
+	return NewData(Async)
 }
 
 func Err(msg string) Data {
