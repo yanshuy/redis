@@ -189,3 +189,20 @@ func (h Handler) HandleACL(args []string) resp.Data {
 		return resp.Err("unknown subcommand '" + args[0] + "'")
 	}
 }
+
+func (h Handler) HandleInfo(args []string) resp.Data {
+	if len(args) == 0 {
+		return resp.WrongArgs("info")
+	}
+
+	switch strings.ToLower(args[0]) {
+	case "replication":
+		if len(args) != 1 {
+			return resp.WrongArgs("info|replication")
+		}
+		return resp.NewData(resp.BulkString, "role:master")
+
+	default:
+		return resp.Err("unsupported/unknown subcommand '" + args[0] + "'")
+	}
+}

@@ -138,6 +138,9 @@ func (h Handler) HandleCmd(cmd client.Command) resp.Data {
 	case "unwatch":
 		return h.HandleUnWatch()
 
+	case "info":
+		return h.HandleInfo(args)
+
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd.Name)
 		return resp.Err(msg)
