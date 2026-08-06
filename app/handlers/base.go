@@ -267,7 +267,8 @@ func HandlePsync(c *client.Client) {
 		sendRDB = true
 	}
 
-	c.RespChan <- resp.NewData(resp.String, strings.Join(str, " "))
+	res := resp.NewData(resp.String, strings.Join(str, " "))
+	c.Conn.Write(res.ToResponse())
 	if sendRDB {
 		c.SendRDB()
 	}
