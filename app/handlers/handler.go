@@ -146,6 +146,9 @@ func HandleCmd(c *client.Client) {
 	case "replconf":
 		HandleReplconf(c)
 
+	case "psync":
+		HandlePsync(c)
+
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd.Name)
 		c.RespChan <- resp.Err(msg)

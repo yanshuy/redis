@@ -248,3 +248,20 @@ func HandleReplconf(c *client.Client) {
 	// args := c.Command.Args
 	c.RespChan <- resp.NewData(resp.String, "OK")
 }
+
+func HandlePsync(c *client.Client) {
+	args := c.Command.Args
+	if len(args) != 2 {
+		c.RespChan <- resp.WrongArgs("psync")
+		return
+	}
+
+	res := []string{"FULLRESYNC"}
+	if args[0] == "?" {
+		res = append(res, server.Global.ReplicationId)
+	}
+	if args[1] == "-1" {
+		res = append(res, strconv.Itoa(server.Global.ReplicationOffset))
+	}
+	c.RespChan <- resp.NewData(resp.String, res)
+}
