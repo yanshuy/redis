@@ -14,6 +14,7 @@ import (
 var (
 	dirFlag    = flag.String("dir", "tmp", "Directory for RDB persistence")
 	dbFileFlag = flag.String("dbfilename", "rdb.snapshot", "RDB file name")
+	portFlag   = flag.String("port", "6379", "port")
 )
 
 func main() {
@@ -25,10 +26,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	reqChan := make(chan request.Request)
+	reqChan := make(chan request.Request, 100)
 	go CommandLoop(store, reqChan)
 
-	l, err := net.Listen("tcp", "0.0.0.0:6379")
+	port := *portFlag
+	l, err := net.Listen("tcp", "0.0.0.0:"+port)
 	if err != nil {
 		log.Fatal("Failed to bind to port 6379")
 	}

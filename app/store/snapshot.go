@@ -34,9 +34,7 @@ func (rs *RedisStore) GetRDBFile(flag int) (*os.File, error) {
 		return nil, fmt.Errorf("mkdir %s: %v", dir, err)
 	}
 	dbfilename := rs.Config["dbfilename"]
-	if dbfilename == "" {
-		dbfilename = "dump.rdb"
-	}
+
 	filePath := filepath.Join(dir, dbfilename)
 	file, err := os.OpenFile(filePath, flag, os.ModePerm)
 	if err != nil {

@@ -38,8 +38,8 @@ func NewClient(conn io.ReadWriteCloser) *Client {
 		Conn:          conn,
 		authAsUser:    user,
 		subscriptions: make(Set[string]),
+		messageChan:   make(chan PubMessage),
 		WatchingKeys:  make(Set[string]),
-		messageChan:   make(chan PubMessage, 100),
 		RespChan:      make(chan resp.Data, 100),
 	}
 	go c.ListenMessages()
