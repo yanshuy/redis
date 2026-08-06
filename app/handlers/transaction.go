@@ -76,3 +76,12 @@ func HandleUnWatch(c *client.Client) {
 	c.CASDirty = false
 	c.RespChan <- resp.NewData(resp.String, "OK")
 }
+
+func filter[T comparable](array []T, elem T) []T {
+	for i, item := range array {
+		if elem == item {
+			return append(array[:i], array[i+1:]...)
+		}
+	}
+	return array
+}

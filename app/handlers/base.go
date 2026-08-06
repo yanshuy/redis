@@ -243,3 +243,8 @@ func HandleInfo(c *client.Client) {
 		c.RespChan <- resp.Err("unsupported/unknown subcommand '" + args[0] + "'")
 	}
 }
+
+func HandleReplconf(c *client.Client) {
+	// args := c.Command.Args
+	c.RespChan <- resp.NewData(resp.String, "OK")
+}
