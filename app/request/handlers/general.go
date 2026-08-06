@@ -133,7 +133,7 @@ func (h Handler) HandleConfig(args []string) resp.Data {
 	sub := strings.ToLower(args[0])
 
 	if sub == "get" {
-		configs, err := h.config.GetConfig(args[1:])
+		configs, err := h.s.Config.GetConfig(args[1:])
 		if err != nil {
 			return resp.Err(err.Error())
 		}
@@ -200,7 +200,12 @@ func (h Handler) HandleInfo(args []string) resp.Data {
 		if len(args) != 1 {
 			return resp.WrongArgs("info|replication")
 		}
-		return resp.NewData(resp.BulkString, "role:"+h.config.Role)
+		reply := strings.Join([]string{
+			"role:" + h.s.Config.Role,
+			"master_replid:" + h.s.ReplicationId,
+			"master_repl_offset:" + strconv.Itoa(h.s.ReplicationOffset),
+		}, "\n")
+		return resp.NewData(resp.BulkString, reply)
 
 	default:
 		return resp.Err("unsupported/unknown subcommand '" + args[0] + "'")

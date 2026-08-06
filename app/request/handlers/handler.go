@@ -12,14 +12,14 @@ import (
 )
 
 type Handler struct {
-	config *server.Config
+	s      *server.Server
 	store  *store.RedisStore
 	client *client.Client
 }
 
 func NewHandler(s *server.Server, client *client.Client) Handler {
 	return Handler{
-		config: &s.Config,
+		s:      s,
 		store:  s.Store,
 		client: client,
 	}

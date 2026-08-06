@@ -1,6 +1,8 @@
 package server
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
@@ -19,14 +21,24 @@ type Config struct {
 }
 
 type Server struct {
-	Config Config
-	Store  *store.RedisStore
+	Config            Config
+	ReplicationId     string
+	ReplicationOffset int
+	Store             *store.RedisStore
+}
+
+func generateRandID() string {
+	bytes := make([]byte, 20)
+	rand.Read(bytes)
+	return hex.EncodeToString(bytes)
 }
 
 func NewServer(config Config, store *store.RedisStore) *Server {
 	return &Server{
-		Config: config,
-		Store:  store,
+		Config:            config,
+		Store:             store,
+		ReplicationId:     generateRandID(),
+		ReplicationOffset: 0,
 	}
 }
 
