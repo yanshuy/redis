@@ -7,12 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/client"
-	"github.com/codecrafters-io/redis-starter-go/app/request"
+	handler "github.com/codecrafters-io/redis-starter-go/app/handlers"
 	"github.com/codecrafters-io/redis-starter-go/app/server"
-	"github.com/codecrafters-io/redis-starter-go/app/server/store"
+	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
 type mockRW struct {
@@ -58,51 +57,48 @@ func createTestStore() *server.Server {
 	if err != nil {
 		panic(err)
 	}
-	return &server.Server{
+	s := &server.Server{
 		Config: server.Config{
 			Dir:        tmpDir,
 			Dbfilename: dbFile,
 		},
 		Store: st,
 	}
+	server.Global = s
+	return s
 }
 
 func runTestPayload(s *server.Server, payload string) (string, error) {
 	conn := newMockRW(payload)
 	c := client.NewClient(conn)
+	c.Server = s
 
-	reqChan := make(chan request.Request, 50)
-	done := make(chan struct{})
-
+	writeDone := make(chan struct{})
 	go func() {
-		for req := range reqChan {
-			request.HandleRequest(s, req)
-		}
-		close(done)
+		_ = c.WriteLoop()
+		close(writeDone)
 	}()
 
-	writerDone := make(chan struct{})
+	cmdChan := make(chan *client.Client, 50)
+
+	errChan := make(chan error, 1)
 	go func() {
-		for respData := range c.RespChan {
-			resBytes := respData.ToResponse()
-			conn.Write(resBytes)
-		}
-		close(writerDone)
+		errChan <- server.ReadRequests(c, cmdChan)
+		close(cmdChan)
 	}()
 
-	err := request.ReadRequests(c, reqChan)
-	close(reqChan)
+	for range cmdChan {
+		handler.HandleCommand(c)
+	}
+
+	err := <-errChan
+
+	c.Close()
+	<-writeDone
+
 	if errors.Is(err, io.EOF) {
 		err = nil
 	}
-
-	select {
-	case <-done:
-	case <-time.After(1 * time.Second):
-	}
-
-	c.Close()
-	<-writerDone
 
 	return conn.Output(), err
 }

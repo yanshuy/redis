@@ -9,29 +9,26 @@ import (
 	"net"
 	"strings"
 
-	"github.com/codecrafters-io/redis-starter-go/app/server/store"
+	"github.com/codecrafters-io/redis-starter-go/app/client"
+	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
 type Config struct {
 	port       string
-	replicaof  *net.TCPAddr
-	Role       string
 	Dir        string
 	Dbfilename string
 }
 
 type Server struct {
 	Config            Config
+	Role              string
+	replicaof         string
 	ReplicationId     string
 	ReplicationOffset int
 	Store             *store.RedisStore
 }
 
-func generateRandID() string {
-	bytes := make([]byte, 20)
-	rand.Read(bytes)
-	return hex.EncodeToString(bytes)
-}
+var Global *Server
 
 func NewServer(config Config, store *store.RedisStore) *Server {
 	return &Server{
@@ -42,22 +39,37 @@ func NewServer(config Config, store *store.RedisStore) *Server {
 	}
 }
 
-func Start() *Server {
+func Init() *Server {
 	config := NewConfig()
 	store, err := store.InitializeStore(config.Dir, config.Dbfilename)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	s := NewServer(config, store)
-	return s
+	Global = NewServer(config, store)
+	replicaof := *replicaofFlag
+	if replicaof == "" {
+		Global.Role = MASTER
+	} else {
+		Global.Role = SLAVE
+		Global.replicaof = replicaof
+	}
+	return Global
 }
 
 func (s *Server) Run(handleConn func(net.Conn)) {
 	port := s.Config.port
+
 	l, err := net.Listen("tcp", "0.0.0.0:"+port)
 	if err != nil {
 		log.Fatal("Failed to bind to port 6379")
+	}
+
+	if s.Role == SLAVE {
+		err := s.HandshakeMaster()
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	for {
@@ -67,6 +79,18 @@ func (s *Server) Run(handleConn func(net.Conn)) {
 			continue
 		}
 		go handleConn(conn)
+	}
+}
+
+func HandleConnection(conn net.Conn, cmdChan chan<- *client.Client) {
+	defer conn.Close()
+
+	c := client.NewClient(conn)
+	go c.WriteLoop()
+
+	err := ReadRequests(c, cmdChan)
+	if err != nil {
+		log.Println("error reading", err)
 	}
 }
 
@@ -85,18 +109,10 @@ var (
 func NewConfig() Config {
 	flag.Parse()
 
-	var role string
-	replicaof := *replicaofFlag
-	if replicaof == "" {
-		role = "master"
-	} else {
-		role = "slave"
-	}
 	dir := *dirFlag
 	dbfilename := *dbFileFlag
 	return Config{
 		port:       *portFlag,
-		Role:       role,
 		Dir:        dir,
 		Dbfilename: dbfilename,
 	}
@@ -117,4 +133,10 @@ func (config *Config) GetConfig(args []string) ([]string, error) {
 		result = append(result, arg, val)
 	}
 	return result, nil
+}
+
+func generateRandID() string {
+	bytes := make([]byte, 20)
+	rand.Read(bytes)
+	return hex.EncodeToString(bytes)
 }

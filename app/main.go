@@ -3,23 +3,24 @@ package main
 import (
 	"net"
 
-	"github.com/codecrafters-io/redis-starter-go/app/request"
+	"github.com/codecrafters-io/redis-starter-go/app/client"
+	handler "github.com/codecrafters-io/redis-starter-go/app/handlers"
 	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
 
 func main() {
-	s := server.Start()
+	s := server.Init()
 
-	reqChan := make(chan request.Request, 100)
-	go CommandLoop(s, reqChan)
+	cmdChan := make(chan *client.Client, 100)
+	go CommandLoop(s, cmdChan)
 
-	s.Run(func(conn net.Conn) {
-		request.HandleConnection(conn, reqChan)
+	s.Run(func(c net.Conn) {
+		server.HandleConnection(c, cmdChan)
 	})
 }
 
-func CommandLoop(s *server.Server, reqChan <-chan request.Request) {
-	for req := range reqChan {
-		request.HandleRequest(s, req)
+func CommandLoop(s *server.Server, cmdChan <-chan *client.Client) {
+	for c := range cmdChan {
+		handler.HandleCommand(c)
 	}
 }

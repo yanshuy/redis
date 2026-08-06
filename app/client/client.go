@@ -11,8 +11,9 @@ type Command struct {
 	Args []string
 }
 
-type Client struct {
+type ClientState struct {
 	Conn       io.ReadWriteCloser
+	Server     any
 	authAsUser *User
 
 	subscriptions Set[string]
@@ -28,13 +29,18 @@ type Client struct {
 	RespChan chan resp.Data
 }
 
+type Client struct {
+	*ClientState
+	Command Command
+}
+
 func NewClient(conn io.ReadWriteCloser) *Client {
 	var user *User
 	if DefaultUser.flags.Contains("nopass") {
 		user = DefaultUser
 	}
 
-	c := &Client{
+	state := &ClientState{
 		Conn:          conn,
 		authAsUser:    user,
 		subscriptions: make(Set[string]),
@@ -42,8 +48,16 @@ func NewClient(conn io.ReadWriteCloser) *Client {
 		WatchingKeys:  make(Set[string]),
 		RespChan:      make(chan resp.Data, 100),
 	}
+	c := &Client{ClientState: state}
 	go c.ListenMessages()
 	return c
+}
+
+func (c *Client) WithCommand(cmd Command) *Client {
+	return &Client{
+		ClientState: c.ClientState,
+		Command:     cmd,
+	}
 }
 
 func (c *Client) Close() error {
