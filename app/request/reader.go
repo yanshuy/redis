@@ -49,7 +49,7 @@ func (r *RequestReader) Read(c *client.Client) (resp.Data, error) {
 	}
 }
 
-func ValidateRequest(req resp.Data) (client.Command, error) {
+func ValidateCommand(req resp.Data) (client.Command, error) {
 	cmd := client.Command{}
 	switch req.Type {
 	case resp.Array:

@@ -24,18 +24,12 @@ const (
 	REDIS_VERSION = "0011"
 )
 
-func (rs *RedisStore) GetRDBFile(flag int) (*os.File, error) {
-	dir := rs.Config["dir"]
-	if dir == "" {
-		dir = "."
-	}
-	err := os.MkdirAll(dir, 0o755)
+func (rs RedisStore) GetRDBFile(flag int) (*os.File, error) {
+	err := os.MkdirAll(rs.dir, 0o755)
 	if err != nil {
-		return nil, fmt.Errorf("mkdir %s: %v", dir, err)
+		return nil, fmt.Errorf("mkdir %s: %v", rs.dir, err)
 	}
-	dbfilename := rs.Config["dbfilename"]
-
-	filePath := filepath.Join(dir, dbfilename)
+	filePath := filepath.Join(rs.dir, rs.dbfilename)
 	file, err := os.OpenFile(filePath, flag, os.ModePerm)
 	if err != nil {
 		return nil, err

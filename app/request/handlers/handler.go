@@ -6,18 +6,21 @@ import (
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
+	"github.com/codecrafters-io/redis-starter-go/app/server"
 
-	"github.com/codecrafters-io/redis-starter-go/app/store"
+	"github.com/codecrafters-io/redis-starter-go/app/server/store"
 )
 
 type Handler struct {
+	config *server.Config
 	store  *store.RedisStore
 	client *client.Client
 }
 
-func NewHandler(store *store.RedisStore, client *client.Client) Handler {
+func NewHandler(s *server.Server, client *client.Client) Handler {
 	return Handler{
-		store:  store,
+		config: &s.Config,
+		store:  s.Store,
 		client: client,
 	}
 }

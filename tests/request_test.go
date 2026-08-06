@@ -14,7 +14,8 @@ import (
 
 	"github.com/codecrafters-io/redis-starter-go/app/client"
 	"github.com/codecrafters-io/redis-starter-go/app/request"
-	"github.com/codecrafters-io/redis-starter-go/app/store"
+	"github.com/codecrafters-io/redis-starter-go/app/server"
+	"github.com/codecrafters-io/redis-starter-go/app/server/store"
 	"github.com/stretchr/testify/require"
 )
 
@@ -48,18 +49,23 @@ func (rw *rw) Output() string {
 	return rw.w.String()
 }
 
-func setupTestStore() *store.RedisStore {
+func setupTestStore() *server.Server {
 	tmpDir := os.TempDir()
 	dbFile := filepath.Join(tmpDir, "rdb.test")
-	config := store.NewConfig("dir", tmpDir, "dbfilename", dbFile)
-	s, err := store.InitializeStore(config)
+	st, err := store.InitializeStore(tmpDir, dbFile)
 	if err != nil {
 		panic(err)
 	}
-	return s
+	return &server.Server{
+		Config: server.Config{
+			Dir:        tmpDir,
+			Dbfilename: dbFile,
+		},
+		Store: st,
+	}
 }
 
-func testReadAndHandleRequest(rs *store.RedisStore, conn *rw) error {
+func testReadAndHandleRequest(rs *server.Server, conn *rw) error {
 	c := client.NewClient(conn)
 	reqChan := make(chan request.Request, 50)
 	done := make(chan struct{})
@@ -190,10 +196,10 @@ func TestRequest_LRANGE_Full(t *testing.T) {
 func Test_func(t *testing.T) {
 	s := setupTestStore()
 	cwd, _ := os.Getwd()
-	dir := s.Config["dir"]
+	dir := s.Config.Dir
 	if !filepath.IsAbs(dir) {
 		dir = filepath.Join(cwd, dir)
 	}
-	j := path.Join("/root", s.Config["dir"], s.Config["dbfilename"])
+	j := path.Join("/root", s.Config.Dir, s.Config.Dbfilename)
 	fmt.Println(j)
 }

@@ -2,36 +2,33 @@ package store
 
 import (
 	"fmt"
-	"log"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/client"
 )
 
-type Config = map[string]string
+type RedisStore struct {
+	Store       map[string]*Value
+	BlockedKeys map[string][]chan BlockResult
+	WatchedKeys map[string][]*client.Client
+
+	dir        string
+	dbfilename string
+}
 
 type BlockResult struct {
 	Key   string
 	Value string
 }
 
-type RedisStore struct {
-	Config      map[string]string
-	Store       map[string]*Value
-	BlockedKeys map[string][]chan BlockResult
-	WatchedKeys map[string][]*client.Client
-	mu          sync.Mutex
-}
-
-func InitializeStore(config Config) (*RedisStore, error) {
+func InitializeStore(dir string, dbfilename string) (*RedisStore, error) {
 	store := &RedisStore{
 		Store:       make(map[string]*Value),
-		Config:      config,
 		BlockedKeys: make(map[string][]chan BlockResult),
 		WatchedKeys: make(map[string][]*client.Client),
-		mu:          sync.Mutex{},
+		dir:         dir,
+		dbfilename:  dbfilename,
 	}
 	err := RestoreRDBSnapshot(store)
 	if err != nil {
@@ -157,31 +154,4 @@ func (rs *RedisStore) TouchWatchedKey(key string) {
 	for _, c := range rs.WatchedKeys[key] {
 		c.CASDirty = true
 	}
-}
-
-// requires even arguments, of key value pair
-func NewConfig(configs ...string) Config {
-	config := make(Config)
-	if len(configs)%2 != 0 {
-		log.Fatal("init config: requrie even arguments, of key value pair")
-	}
-	for i := 0; i < len(configs); i += 2 {
-		key := configs[i]
-		val := configs[i+1]
-		config[key] = val
-	}
-	return config
-}
-
-func (rs *RedisStore) ConfigGet(args []string) ([]string, error) {
-	result := make([]string, 0, len(args)*2)
-	for _, arg := range args {
-		val, ok := rs.Config[arg]
-		if !ok {
-			return nil, fmt.Errorf("unknown config %s", arg)
-		}
-		result = append(result, arg)
-		result = append(result, val)
-	}
-	return result, nil
 }

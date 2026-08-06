@@ -31,7 +31,7 @@ func (d *Data) Is(dataType byte) bool {
 
 func NewData(t byte, data ...any) Data {
 	d := Data{Type: t}
-	if data == nil {
+	if len(data) == 0 {
 		return d
 	}
 	datum := data[0]

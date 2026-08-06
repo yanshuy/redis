@@ -2,12 +2,13 @@ package request
 
 import (
 	"fmt"
+	"log"
+	"net"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
 	handler "github.com/codecrafters-io/redis-starter-go/app/request/handlers"
-
-	"github.com/codecrafters-io/redis-starter-go/app/store"
+	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
 
 type Request struct {
@@ -32,7 +33,7 @@ func ReadRequests(c *client.Client, reqChan chan<- Request) error {
 		if err != nil {
 			return err
 		}
-		cmd, err := ValidateRequest(d)
+		cmd, err := ValidateCommand(d)
 		if err != nil {
 			return err
 		}
@@ -41,7 +42,19 @@ func ReadRequests(c *client.Client, reqChan chan<- Request) error {
 	}
 }
 
-func HandleRequest(store *store.RedisStore, req Request) {
+func HandleConnection(conn net.Conn, reqChan chan<- Request) {
+	defer conn.Close()
+
+	c := client.NewClient(conn)
+	go c.WriteLoop()
+
+	err := ReadRequests(c, reqChan)
+	if err != nil {
+		log.Println("error reading", err)
+	}
+}
+
+func HandleRequest(s *server.Server, req Request) {
 	cmd := req.cmd
 	c := req.client
 
@@ -52,7 +65,7 @@ func HandleRequest(store *store.RedisStore, req Request) {
 	}
 
 	Chain(func() {
-		h := handler.NewHandler(store, c)
+		h := handler.NewHandler(s, c)
 		res := h.HandleCmd(cmd)
 		if !res.Is(resp.Async) {
 			c.RespChan <- res

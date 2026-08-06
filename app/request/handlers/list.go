@@ -5,7 +5,7 @@ import (
 	"time"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
-	"github.com/codecrafters-io/redis-starter-go/app/store"
+	"github.com/codecrafters-io/redis-starter-go/app/server/store"
 )
 
 func (h Handler) HandleRpush(args []string) resp.Data {

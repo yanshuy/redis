@@ -6,7 +6,7 @@ import (
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
-	"github.com/codecrafters-io/redis-starter-go/app/store"
+	"github.com/codecrafters-io/redis-starter-go/app/server/store"
 )
 
 func (h Handler) HandleGet(args []string) resp.Data {
@@ -133,7 +133,7 @@ func (h Handler) HandleConfig(args []string) resp.Data {
 	sub := strings.ToLower(args[0])
 
 	if sub == "get" {
-		configs, err := h.store.ConfigGet(args[1:])
+		configs, err := h.config.GetConfig(args[1:])
 		if err != nil {
 			return resp.Err(err.Error())
 		}
@@ -200,7 +200,7 @@ func (h Handler) HandleInfo(args []string) resp.Data {
 		if len(args) != 1 {
 			return resp.WrongArgs("info|replication")
 		}
-		return resp.NewData(resp.BulkString, "role:master")
+		return resp.NewData(resp.BulkString, "role:"+h.config.Role)
 
 	default:
 		return resp.Err("unsupported/unknown subcommand '" + args[0] + "'")

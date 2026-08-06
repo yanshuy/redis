@@ -11,7 +11,8 @@ import (
 
 	"github.com/codecrafters-io/redis-starter-go/app/client"
 	"github.com/codecrafters-io/redis-starter-go/app/request"
-	"github.com/codecrafters-io/redis-starter-go/app/store"
+	"github.com/codecrafters-io/redis-starter-go/app/server"
+	"github.com/codecrafters-io/redis-starter-go/app/server/store"
 )
 
 type mockRW struct {
@@ -50,18 +51,23 @@ func (rw *mockRW) Output() string {
 	return rw.w.String()
 }
 
-func createTestStore() *store.RedisStore {
+func createTestStore() *server.Server {
 	tmpDir := os.TempDir()
 	dbFile := filepath.Join(tmpDir, "rdb.test")
-	config := store.NewConfig("dir", tmpDir, "dbfilename", dbFile)
-	s, err := store.InitializeStore(config)
+	st, err := store.InitializeStore(tmpDir, dbFile)
 	if err != nil {
 		panic(err)
 	}
-	return s
+	return &server.Server{
+		Config: server.Config{
+			Dir:        tmpDir,
+			Dbfilename: dbFile,
+		},
+		Store: st,
+	}
 }
 
-func runTestPayload(s *store.RedisStore, payload string) (string, error) {
+func runTestPayload(s *server.Server, payload string) (string, error) {
 	conn := newMockRW(payload)
 	c := client.NewClient(conn)
 
