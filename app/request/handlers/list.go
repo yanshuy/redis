@@ -123,7 +123,7 @@ func (h Handler) HandleBlpop(args []string) resp.Data {
 		}
 	}
 
-	result := make(chan store.BlockResult)
+	result := make(chan store.BlockResult, 1)
 	for _, key := range keys {
 		h.store.BlockedKeys[key] = append(h.store.BlockedKeys[key], result)
 	}
@@ -144,9 +144,6 @@ func (h Handler) HandleBlpop(args []string) resp.Data {
 		}
 
 		h.client.UnBlock()
-		for _, key := range keys {
-			h.store.BlockedKeys[key] = filter(h.store.BlockedKeys[key], result)
-		}
 	}()
 
 	return resp.Future()

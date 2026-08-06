@@ -10,15 +10,23 @@ func (rs *RedisStore) NotifyBlockedClient(key string, values []string) []string 
 		return values
 	}
 
-	n := min(len(values), len(blocked))
+	remainingValues := values
+	var remainingBlocked []chan BlockResult
 
-	clients := blocked[:n]
-	rs.BlockedKeys[key] = blocked[n:]
-
-	for i, ch := range clients {
-		ch <- BlockResult{Key: key, Value: values[i]}
+	for i, ch := range blocked {
+		if len(remainingValues) == 0 {
+			remainingBlocked = append(remainingBlocked, blocked[i:]...)
+			break
+		}
+		select {
+		case ch <- BlockResult{Key: key, Value: remainingValues[0]}:
+			remainingValues = remainingValues[1:]
+		default:
+		}
 	}
-	return values[n:]
+
+	rs.BlockedKeys[key] = remainingBlocked
+	return remainingValues
 }
 
 func (rs *RedisStore) Rpush(key string, elements []string) (int, error) {

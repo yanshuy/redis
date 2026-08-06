@@ -72,7 +72,6 @@ func (c *Client) Block() {
 }
 
 func (c *Client) UnBlock() {
-	c.Unblock <- struct{}{}
 	c.Blocked = false
 	close(c.Unblock)
 }
