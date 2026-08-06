@@ -263,5 +263,5 @@ func HandlePsync(c *client.Client) {
 	if args[1] == "-1" {
 		str = append(str, strconv.Itoa(server.Global.ReplicationOffset))
 	}
-	c.RespChan <- resp.NewData(resp.BulkString, strings.Join(str, " "))
+	c.RespChan <- resp.NewData(resp.String, strings.Join(str, " "))
 }
