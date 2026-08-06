@@ -2,24 +2,24 @@ package server
 
 import (
 	"errors"
+	"net"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
-	"github.com/codecrafters-io/redis-starter-go/app/client"
 )
 
-type RequestReader struct {
+type Reader struct {
 	buf []byte
 	off int
 }
 
-func NewRequestReader() RequestReader {
-	return RequestReader{
+func NewReader() Reader {
+	return Reader{
 		buf: make([]byte, 1024),
 		off: 0,
 	}
 }
 
-func (r *RequestReader) Read(c *client.Client) (resp.Data, error) {
+func (r *Reader) ReadRESP(conn net.Conn) (resp.Data, error) {
 	b := r.buf
 
 	for {
@@ -39,7 +39,7 @@ func (r *RequestReader) Read(c *client.Client) (resp.Data, error) {
 			return resp.Data{}, errors.New("request too large")
 		}
 
-		n, err := c.Conn.Read(b[r.off:])
+		n, err := conn.Read(b[r.off:])
 		r.off += n
 
 		if err != nil {

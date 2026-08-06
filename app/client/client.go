@@ -1,7 +1,7 @@
 package client
 
 import (
-	"io"
+	"net"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
 )
@@ -12,7 +12,7 @@ type Command struct {
 }
 
 type ClientState struct {
-	Conn       io.ReadWriteCloser
+	Conn       net.Conn
 	Server     any
 	authAsUser *User
 
@@ -34,7 +34,7 @@ type Client struct {
 	Command Command
 }
 
-func NewClient(conn io.ReadWriteCloser) *Client {
+func NewClient(conn net.Conn) *Client {
 	var user *User
 	if DefaultUser.flags.Contains("nopass") {
 		user = DefaultUser

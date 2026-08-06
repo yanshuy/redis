@@ -9,12 +9,12 @@ import (
 )
 
 func ReadRequests(c *client.Client, cmdChan chan<- *client.Client) error {
-	r := NewRequestReader()
+	r := NewReader()
 	for {
 		if c.Blocked {
 			<-c.Unblock
 		}
-		d, err := r.Read(c)
+		d, err := r.ReadRESP(c.Conn)
 		if err != nil {
 			return err
 		}
