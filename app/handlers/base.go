@@ -256,12 +256,12 @@ func HandlePsync(c *client.Client) {
 		return
 	}
 
-	res := []string{"FULLRESYNC"}
+	str := []string{"FULLRESYNC"}
 	if args[0] == "?" {
-		res = append(res, server.Global.ReplicationId)
+		str = append(str, server.Global.ReplicationId)
 	}
 	if args[1] == "-1" {
-		res = append(res, strconv.Itoa(server.Global.ReplicationOffset))
+		str = append(str, strconv.Itoa(server.Global.ReplicationOffset))
 	}
-	c.RespChan <- resp.NewData(resp.String, res)
+	c.RespChan <- resp.NewData(resp.BulkString, strings.Join(res, " "))
 }
