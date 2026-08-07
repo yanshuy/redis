@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	Async          byte = 0
+	Empty          byte = 0
 	Error          byte = '-'
 	String         byte = '+'
 	Integer        byte = ':'
@@ -146,7 +146,7 @@ func (d *Data) ToResponse() []byte {
 		res = fmt.Append(res, d.Str+crlf)
 		return res
 
-	case NullBulkString:
+	case NullBulkString, Empty:
 		return []byte("$-1\r\n")
 
 	case BulkString:
@@ -183,8 +183,8 @@ func (d *Data) ToResponse() []byte {
 	}
 }
 
-func Future() Data {
-	return NewData(Async)
+func None() Data {
+	return NewData(Empty)
 }
 
 func Err(msg string) Data {

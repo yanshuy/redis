@@ -3,10 +3,38 @@ package server
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
+	"github.com/codecrafters-io/redis-starter-go/app/client"
+	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
+
+func (s *Server) NewReplica(c *client.Client) error {
+	c.Role = client.SLAVE
+	c.CloseMessageChan()
+
+	str := []string{"FULLRESYNC", Global.ReplicationId, strconv.Itoa(Global.ReplicationOffset)}
+	res := resp.NewData(resp.String, strings.Join(str, " "))
+
+	_, err := c.Conn.Write(res.ToResponse())
+	if err != nil {
+		return fmt.Errorf("failed to send message to peer")
+	}
+
+	store.SendRDB(c)
+	//TODO: handle error
+
+	Global.replicas = append(Global.replicas, c)
+	return nil
+}
+
+func (s *Server) Propagate(cmd client.Command) {
+	for _, client := range s.replicas {
+		client.QueueMessage(cmd.ToRESP())
+	}
+}
 
 func (s *Server) HandshakeMaster() error {
 	parts := strings.Fields(s.replicaof)
@@ -53,20 +81,5 @@ func (s *Server) HandshakeMaster() error {
 	repl_off := fields[2]
 	fmt.Print(repl_id, repl_off)
 
-	return nil
-}
-
-func (r *Reader) exchange(conn net.Conn, out resp.Data, expected string) error {
-	_, err := conn.Write(out.ToResponse())
-	if err != nil {
-		return fmt.Errorf("failed to send message to peer")
-	}
-	resp, err := r.ReadRESP(conn)
-	if err != nil {
-		return fmt.Errorf("failed to read message from peer")
-	}
-	if !strings.EqualFold(resp.Str, expected) {
-		return fmt.Errorf("unexpected response from peer")
-	}
 	return nil
 }

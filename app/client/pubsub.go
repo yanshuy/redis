@@ -22,7 +22,7 @@ func (c *Channels) Subscribers(channel string) int {
 func (c *Client) ListenMessages() {
 	for pub := range c.messageChan {
 		res := resp.NewData(resp.Array, "message", pub.channel, pub.message)
-		c.RespChan <- res
+		c.QueueMessage(res)
 	}
 }
 
@@ -61,7 +61,7 @@ func (c *Channels) Publish(channel string, message string) int {
 }
 
 func (c *Channels) Unsubscribe(client *Client, channel string) {
-	if ok := client.subscriptions.Contains(channel); !ok {
+	if !client.subscriptions.Contains(channel) {
 		return
 	}
 

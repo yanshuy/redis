@@ -21,6 +21,6 @@ func main() {
 
 func CommandLoop(s *server.Server, cmdChan <-chan *client.Client) {
 	for c := range cmdChan {
-		handler.HandleCommand(c)
+		handler.HandleRequest(c)
 	}
 }

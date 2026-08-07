@@ -10,152 +10,155 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
-func HandleCommand(c *client.Client) {
-	if c.Command.Name == "quit" {
-		c.RespChan <- resp.NewData(resp.String, "OK")
-		c.Close()
-		return
-	}
+var s *server.Server
 
-	Chain(func() {
-		HandleCmd(c)
-	}, Auth(c), SubscribeMode(c), Multi(c))()
+var handler = Chain(HandleCmd, Auth, SubscribeMode, Multi)
+
+func HandleRequest(c *client.Client) {
+	s = server.Global // crime
+
+	res := handler(c)
+	c.QueueMessage(res)
 }
 
-func HandleCmd(c *client.Client) {
+func HandleCmd(c *client.Client) resp.Data {
 	cmd := c.Command
 	args := cmd.Args
 
 	switch cmd.Name {
 	case "ping":
-		c.RespChan <- resp.NewData(resp.String, "PONG")
+		return resp.NewData(resp.String, "PONG")
 
 	case "echo":
 		if len(args) != 1 {
-			c.RespChan <- resp.WrongArgs("echo")
-			return
+			return resp.WrongArgs("echo")
 		}
-		c.RespChan <- resp.NewData(resp.BulkString, args[0])
+		return resp.NewData(resp.BulkString, args[0])
+
+	case "quit":
+		res := resp.NewData(resp.String, "OK")
+		c.Conn.Write(res.ToResponse())
+		c.Close()
+		return resp.None()
 
 	case "type":
-		HandleType(c)
+		return HandleType(c)
 
 	case "keys":
-		HandleKeys(c)
+		return HandleKeys(c)
 
 	case "acl":
-		HandleACL(c)
+		return HandleACL(c)
 
 	case "auth":
-		HandleAuth(c)
+		return HandleAuth(c)
 
 	case "get":
-		HandleGet(c)
+		return HandleGet(c)
 
 	case "set":
-		HandleSet(c)
+		return HandleSet(c)
 
 	case "subscribe":
-		HandleSubscribe(c)
+		return HandleSubscribe(c)
 
 	case "unsubscribe":
-		HandleUnsubscribe(c)
+		return HandleUnsubscribe(c)
 
 	case "publish":
-		HandlePublish(c)
+		return HandlePublish(c)
 
 	case "rpush":
-		HandleRpush(c)
+		return HandleRpush(c)
 
 	case "lpush":
-		HandleLpush(c)
+		return HandleLpush(c)
 
 	case "llen":
-		HandleLlen(c)
+		return HandleLlen(c)
 
 	case "lpop":
-		HandleLpop(c)
+		return HandleLpop(c)
 
 	case "lrange":
-		HandleLrange(c)
+		return HandleLrange(c)
 
 	case "blpop":
-		HandleBlpop(c)
+		return HandleBlpop(c)
 
 	case "zadd":
-		HandleZadd(c)
+		return HandleZadd(c)
 
 	case "zrank":
-		HandleZrank(c)
+		return HandleZrank(c)
 
 	case "zrange":
-		HandleZrange(c)
+		return HandleZrange(c)
 
 	case "zcard":
-		HandleZcard(c)
+		return HandleZcard(c)
 
 	case "zscore":
-		HandleZscore(c)
+		return HandleZscore(c)
 
 	case "zrem":
-		HandleZrem(c)
+		return HandleZrem(c)
 
 	case "xadd":
-		HandleXadd(c)
+		return HandleXadd(c)
 
 	case "xrange":
-		HandleXrange(c)
+		return HandleXrange(c)
 
 	case "xread":
-		HandleXread(c)
+		return HandleXread(c)
 
 	case "config":
-		HandleConfig(c)
+		return HandleConfig(c)
 
 	case "save":
-		err := store.SaveRDBSnapshot(server.Global.Store)
+		err := store.SaveRDBSnapshot(s.Store)
 		if err != nil {
 			log.Println(err)
-			c.RespChan <- resp.Err("save failed")
-			return
+			return resp.Err("save failed")
 		}
-		c.RespChan <- resp.NewData(resp.String, "OK")
+		return resp.NewData(resp.String, "OK")
 
 	case "incr":
-		HandleCmdIncr(c)
+		return HandleCmdIncr(c)
 
 	case "multi":
 		c.InMulti = true
-		c.RespChan <- resp.NewData(resp.String, "OK")
+		return resp.NewData(resp.String, "OK")
 
 	case "exec":
-		HandleExec(c)
+		return HandleExec(c)
 
 	case "discard":
-		HandleDiscard(c)
+		return HandleDiscard(c)
 
 	case "watch":
-		HandleWatch(c)
+		return HandleWatch(c)
 
 	case "unwatch":
-		HandleUnWatch(c)
+		return HandleUnWatch(c)
 
 	case "info":
-		HandleInfo(c)
+		return HandleInfo(c)
 
 	case "replconf":
-		HandleReplconf(c)
+		return HandleReplconf(c)
 
 	case "psync":
-		HandlePsync(c)
+		return HandlePsync(c)
 
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd.Name)
-		c.RespChan <- resp.Err(msg)
+		return resp.Err(msg)
 	}
 }
 
-type MiddlewareFunc func()
+type MiddlewareFunc func(*client.Client) resp.Data
 
 type Middleware func(MiddlewareFunc) MiddlewareFunc
 
@@ -167,59 +170,50 @@ func Chain(h MiddlewareFunc, ms ...Middleware) MiddlewareFunc {
 	return h
 }
 
-func Auth(c *client.Client) Middleware {
-	return func(next MiddlewareFunc) MiddlewareFunc {
-		return func() {
-			if c.IsAuthenticated() {
-				next()
-				return
-			}
-			switch c.Command.Name {
-			case "auth", "hello", "ping":
-				next()
-			default:
-				c.RespChan <- resp.NoAuth()
-			}
+func Auth(next MiddlewareFunc) MiddlewareFunc {
+	return func(c *client.Client) resp.Data {
+		if c.IsAuthenticated() {
+			return next(c)
+		}
+		switch c.Command.Name {
+		case "auth", "hello", "ping":
+			return next(c)
+		default:
+			return resp.NoAuth()
 		}
 	}
 }
 
-func SubscribeMode(c *client.Client) Middleware {
-	return func(next MiddlewareFunc) MiddlewareFunc {
-		return func() {
-			if !c.InSubscribeMode() {
-				next()
-				return
-			}
-			switch c.Command.Name {
-			case "ping":
-				c.RespChan <- resp.NewData(resp.Array, "pong", "")
-			case "subscribe", "unsubscribe":
-				next()
-			default:
-				msg := fmt.Sprintf("Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", c.Command.Name)
-				c.RespChan <- resp.Err(msg)
-			}
+func SubscribeMode(next MiddlewareFunc) MiddlewareFunc {
+	return func(c *client.Client) resp.Data {
+		if !c.InSubscribeMode() {
+			return next(c)
+		}
+		switch c.Command.Name {
+		case "ping":
+			return resp.NewData(resp.Array, "pong", "")
+		case "subscribe", "unsubscribe":
+			return next(c)
+		default:
+			msg := fmt.Sprintf("Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", c.Command.Name)
+			return resp.Err(msg)
 		}
 	}
 }
 
-func Multi(c *client.Client) Middleware {
-	return func(next MiddlewareFunc) MiddlewareFunc {
-		return func() {
-			if !c.InMulti {
-				next()
-				return
-			}
-			switch c.Command.Name {
-			case "exec", "discard":
-				next()
-			case "watch":
-				c.RespChan <- resp.Err("WATCH inside MULTI is not allowed")
-			default:
-				c.QueuedCmds = append(c.QueuedCmds, c.Command)
-				c.RespChan <- resp.NewData(resp.String, "QUEUED")
-			}
+func Multi(next MiddlewareFunc) MiddlewareFunc {
+	return func(c *client.Client) resp.Data {
+		if !c.InMulti {
+			return next(c)
+		}
+		switch c.Command.Name {
+		case "exec", "discard":
+			return next(c)
+		case "watch":
+			return resp.Err("WATCH inside MULTI is not allowed")
+		default:
+			c.QueuedCmds = append(c.QueuedCmds, c.Command)
+			return resp.NewData(resp.String, "QUEUED")
 		}
 	}
 }

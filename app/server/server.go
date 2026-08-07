@@ -20,12 +20,14 @@ type Config struct {
 }
 
 type Server struct {
-	Config            Config
-	Role              string
+	Role              client.Role
 	replicaof         string
 	ReplicationId     string
 	ReplicationOffset int
-	Store             *store.RedisStore
+
+	Config   Config
+	Store    *store.RedisStore
+	replicas []*client.Client
 }
 
 var Global *Server
@@ -39,7 +41,16 @@ func NewServer(config Config, store *store.RedisStore) *Server {
 	}
 }
 
+var (
+	dirFlag       = flag.String("dir", "tmp", "Directory for RDB persistence")
+	dbFileFlag    = flag.String("dbfilename", "rdb.snapshot", "RDB file name")
+	portFlag      = flag.String("port", "6379", "port")
+	replicaofFlag = flag.String("replicaof", "", "replica of")
+)
+
 func Init() *Server {
+	flag.Parse()
+
 	config := NewConfig()
 	store, err := store.InitializeStore(config.Dir, config.Dbfilename)
 	if err != nil {
@@ -49,9 +60,9 @@ func Init() *Server {
 	Global = NewServer(config, store)
 	replicaof := *replicaofFlag
 	if replicaof == "" {
-		Global.Role = MASTER
+		Global.Role = client.MASTER
 	} else {
-		Global.Role = SLAVE
+		Global.Role = client.SLAVE
 		Global.replicaof = replicaof
 	}
 	return Global
@@ -65,7 +76,7 @@ func (s *Server) Run(handleConn func(net.Conn)) {
 		log.Fatal("Failed to bind to port 6379")
 	}
 
-	if s.Role == SLAVE {
+	if s.Role == client.SLAVE {
 		err := s.HandshakeMaster()
 		if err != nil {
 			log.Fatal(err)
@@ -94,21 +105,7 @@ func HandleConnection(conn net.Conn, cmdChan chan<- *client.Client) {
 	}
 }
 
-var (
-	dirFlag       = flag.String("dir", "tmp", "Directory for RDB persistence")
-	dbFileFlag    = flag.String("dbfilename", "rdb.snapshot", "RDB file name")
-	portFlag      = flag.String("port", "6379", "port")
-	replicaofFlag = flag.String("replicaof", "", "replica of")
-)
-
-var (
-	MASTER = "master"
-	SLAVE  = "slave"
-)
-
 func NewConfig() Config {
-	flag.Parse()
-
 	dir := *dirFlag
 	dbfilename := *dbFileFlag
 	return Config{

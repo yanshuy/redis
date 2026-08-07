@@ -2,7 +2,9 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"net"
+	"strings"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
 )
@@ -46,4 +48,19 @@ func (r *Reader) ReadRESP(conn net.Conn) (resp.Data, error) {
 			return resp.Data{}, err
 		}
 	}
+}
+
+func (r *Reader) exchange(conn net.Conn, out resp.Data, expected string) error {
+	_, err := conn.Write(out.ToResponse())
+	if err != nil {
+		return fmt.Errorf("failed to send message to peer")
+	}
+	resp, err := r.ReadRESP(conn)
+	if err != nil {
+		return fmt.Errorf("failed to read message from peer")
+	}
+	if !strings.EqualFold(resp.Str, expected) {
+		return fmt.Errorf("unexpected response from peer")
+	}
+	return nil
 }

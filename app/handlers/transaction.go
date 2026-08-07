@@ -6,62 +6,53 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
 
-func HandleExec(c *client.Client) {
-	if c.InMulti {
-		c.InMulti = false
-	} else {
-		c.RespChan <- resp.Err("EXEC without MULTI")
-		return
+func HandleExec(c *client.Client) resp.Data {
+	if !c.InMulti {
+		return resp.Err("EXEC without MULTI")
 	}
+	c.InMulti = false
 
 	dirty := c.CASDirty
-	c.CASDirty = false
 
 	queued := c.QueuedCmds
 	c.QueuedCmds = nil
 
+	HandleUnWatch(c)
+
 	if dirty {
-		c.RespChan <- resp.NewData(resp.Array)
-		return
+		return resp.NewData(resp.Array)
 	}
 
-	respChanBak := c.RespChan
-	results := make([]resp.Data, 0, len(queued))
-	c.RespChan = make(chan resp.Data, len(queued))
-
-	for _, cmd := range queued {
+	results := make([]resp.Data, len(queued))
+	for i, cmd := range queued {
 		c.Command = cmd
-		HandleCmd(c)
-		results = append(results, <-c.RespChan)
+		res := Chain(HandleCmd, Auth, SubscribeMode)(c)
+		results[i] = res
 	}
-
-	c.RespChan = respChanBak
-	c.CASDirty = false
-	c.RespChan <- resp.NewData(resp.Array, results)
+	return resp.NewData(resp.Array, results)
 }
 
-func HandleDiscard(c *client.Client) {
+func HandleDiscard(c *client.Client) resp.Data {
 	if c.InMulti {
 		c.InMulti = false
 	} else {
-		c.RespChan <- resp.Err("DISCARD without MULTI")
-		return
+		return resp.Err("DISCARD without MULTI")
 	}
 	c.QueuedCmds = nil
 	c.CASDirty = false
-	c.RespChan <- resp.NewData(resp.String, "OK")
+	return resp.NewData(resp.String, "OK")
 }
 
-func HandleWatch(c *client.Client) {
+func HandleWatch(c *client.Client) resp.Data {
 	args := c.Command.Args
 	for _, key := range args {
 		c.WatchingKeys.Add(key)
 		server.Global.Store.WatchedKeys[key] = append(server.Global.Store.WatchedKeys[key], c)
 	}
-	c.RespChan <- resp.NewData(resp.String, "OK")
+	return resp.NewData(resp.String, "OK")
 }
 
-func HandleUnWatch(c *client.Client) {
+func HandleUnWatch(c *client.Client) resp.Data {
 	for key := range c.WatchingKeys {
 		clients := server.Global.Store.WatchedKeys[key]
 		clients = filter(clients, c)
@@ -74,7 +65,7 @@ func HandleUnWatch(c *client.Client) {
 	}
 	clear(c.WatchingKeys)
 	c.CASDirty = false
-	c.RespChan <- resp.NewData(resp.String, "OK")
+	return resp.NewData(resp.String, "OK")
 }
 
 func filter[T comparable](array []T, elem T) []T {

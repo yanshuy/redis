@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -11,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/codecrafters-io/redis-starter-go/app/client"
 )
 
 const (
@@ -400,4 +403,16 @@ func RestoreRDBSnapshot(rs *RedisStore) (err error) {
 		}
 	}
 	return nil
+}
+
+var RDB, _ = hex.DecodeString("524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2")
+
+func SendRDB(c *client.Client) {
+	buf := fmt.Appendf(nil, "$%d\r\n", len(RDB))
+	buf = append(buf, RDB...)
+
+	_, err := c.Conn.Write(buf)
+	if err != nil {
+		log.Fatal("error sending RDB to slave", err.Error())
+	}
 }

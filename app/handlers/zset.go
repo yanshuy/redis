@@ -8,11 +8,10 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
 
-func HandleZadd(c *client.Client) {
+func HandleZadd(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) <= 1 {
-		c.RespChan <- resp.WrongArgs("ZADD")
-		return
+		return resp.WrongArgs("ZADD")
 	}
 
 	key := args[0]
@@ -25,8 +24,7 @@ func HandleZadd(c *client.Client) {
 	for i := 0; i < n; i += 2 {
 		score, err := strconv.ParseFloat(args[i], 64)
 		if err != nil {
-			c.RespChan <- resp.Err("resulting score is not a number (NaN)")
-			return
+			return resp.Err("resulting score is not a number (NaN")
 		}
 		scores = append(scores, score)
 		members = append(members, args[i+1])
@@ -34,102 +32,87 @@ func HandleZadd(c *client.Client) {
 
 	added, err := server.Global.Store.Zadd(key, scores, members)
 	if err != nil {
-		c.RespChan <- resp.Err(err.Error())
-		return
+		return resp.Err(err.Error())
 	}
-	c.RespChan <- resp.NewData(resp.Integer, added)
+	return resp.NewData(resp.Integer, added)
 }
 
-func HandleZrank(c *client.Client) {
+func HandleZrank(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) != 2 {
-		c.RespChan <- resp.WrongArgs("zrank")
-		return
+		return resp.WrongArgs("zrank")
 	}
 
 	rank, found, err := server.Global.Store.Zrank(args[0], args[1])
 	if err != nil {
-		c.RespChan <- resp.Err(err.Error())
-		return
+		return resp.Err(err.Error())
 	}
 	if !found {
-		c.RespChan <- resp.NewData(resp.NullBulkString)
-		return
+		return resp.NewData(resp.NullBulkString)
 	}
-	c.RespChan <- resp.NewData(resp.Integer, rank)
+	return resp.NewData(resp.Integer, rank)
 }
 
-func HandleZrange(c *client.Client) {
+func HandleZrange(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) != 3 {
-		c.RespChan <- resp.WrongArgs("zrange")
-		return
+		return resp.WrongArgs("zrange")
 	}
 
 	start, err := strconv.Atoi(args[1])
 	if err != nil {
-		c.RespChan <- resp.Err("value is not an integer or out of range")
-		return
+		return resp.Err("value is not an integer or out of range")
 	}
 	end, err := strconv.Atoi(args[2])
 	if err != nil {
-		c.RespChan <- resp.Err("value is not an integer or out of range")
-		return
+		return resp.Err("value is not an integer or out of range")
 	}
 
 	list, err := server.Global.Store.Zrange(args[0], start, end)
 	if err != nil {
-		c.RespChan <- resp.Err(err.Error())
-		return
+		return resp.Err(err.Error())
 	}
-	c.RespChan <- resp.NewData(resp.Array, list)
+	return resp.NewData(resp.Array, list)
 }
 
-func HandleZcard(c *client.Client) {
+func HandleZcard(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) != 1 {
-		c.RespChan <- resp.WrongArgs("zcard")
-		return
+		return resp.WrongArgs("zcard")
 	}
 
 	card, err := server.Global.Store.Zcard(args[0])
 	if err != nil {
-		c.RespChan <- resp.Err(err.Error())
-		return
+		return resp.Err(err.Error())
 	}
-	c.RespChan <- resp.NewData(resp.Integer, card)
+	return resp.NewData(resp.Integer, card)
 }
 
-func HandleZscore(c *client.Client) {
+func HandleZscore(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) != 2 {
-		c.RespChan <- resp.WrongArgs("zscore")
-		return
+		return resp.WrongArgs("zscore")
 	}
 
 	score, found, err := server.Global.Store.Zscore(args[0], args[1])
 	if err != nil {
-		c.RespChan <- resp.Err(err.Error())
-		return
+		return resp.Err(err.Error())
 	}
 	if !found {
-		c.RespChan <- resp.NewData(resp.NullBulkString)
-		return
+		return resp.NewData(resp.NullBulkString)
 	}
-	c.RespChan <- resp.NewData(resp.BulkString, strconv.FormatFloat(score, 'g', -1, 64))
+	return resp.NewData(resp.BulkString, strconv.FormatFloat(score, 'g', -1, 64))
 }
 
-func HandleZrem(c *client.Client) {
+func HandleZrem(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) != 2 {
-		c.RespChan <- resp.WrongArgs("zrem")
-		return
+		return resp.WrongArgs("zrem")
 	}
 
 	removed, err := server.Global.Store.Zrem(args[0], args[1])
 	if err != nil {
-		c.RespChan <- resp.Err(err.Error())
-		return
+		return resp.Err(err.Error())
 	}
-	c.RespChan <- resp.NewData(resp.Integer, removed)
+	return resp.NewData(resp.Integer, removed)
 }

@@ -8,11 +8,10 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
 
-func HandleXadd(c *client.Client) {
+func HandleXadd(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) < 4 || (len(args)-2)%2 != 0 {
-		c.RespChan <- resp.WrongArgs("xadd")
-		return
+		return resp.WrongArgs("xadd")
 	}
 	key := args[0]
 	stream_key := args[1]
@@ -20,31 +19,27 @@ func HandleXadd(c *client.Client) {
 
 	s, err := server.Global.Store.Xadd(key, stream_key, key_vals)
 	if err != nil {
-		c.RespChan <- resp.Err(err.Error())
-		return
+		return resp.Err(err.Error())
 	}
 
-	c.RespChan <- resp.NewData(resp.BulkString, s)
+	return resp.NewData(resp.BulkString, s)
 }
 
-func HandleXrange(c *client.Client) {
+func HandleXrange(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) != 3 {
-		c.RespChan <- resp.WrongArgs("xrange")
-		return
+		return resp.WrongArgs("xrange")
 	}
 	key := args[0]
 	if key == "" {
-		c.RespChan <- resp.Err("key, val must be a string length > 0")
-		return
+		return resp.Err("key, val must be a string length > 0")
 	}
 	startStr := args[1]
 	endStr := args[2]
 
 	entries, err := server.Global.Store.XRange(key, startStr, endStr)
 	if err != nil {
-		c.RespChan <- resp.Err(err.Error())
-		return
+		return resp.Err(err.Error())
 	}
 
 	res := resp.NewData(resp.Array)
@@ -56,9 +51,9 @@ func HandleXrange(c *client.Client) {
 		entryArr.Arr = append(entryArr.Arr, id, fields)
 		res.Arr = append(res.Arr, entryArr)
 	}
-	c.RespChan <- res
+	return res
 }
 
-func HandleXread(c *client.Client) {
-	c.RespChan <- resp.NewData(resp.Array)
+func HandleXread(c *client.Client) resp.Data {
+	return resp.NewData(resp.Array)
 }

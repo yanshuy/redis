@@ -6,30 +6,26 @@ import (
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
-	"github.com/codecrafters-io/redis-starter-go/app/server"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
-func HandleGet(c *client.Client) {
+func HandleGet(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) != 1 {
-		c.RespChan <- resp.WrongArgs("get")
-		return
+		return resp.WrongArgs("get")
 	}
 	key := args[0]
-	val := server.Global.Store.Get(key)
+	val := s.Store.Get(key)
 	if val == "" {
-		c.RespChan <- resp.NewData(resp.NullBulkString)
-		return
+		return resp.NewData(resp.NullBulkString)
 	}
-	c.RespChan <- resp.NewData(resp.BulkString, val)
+	return resp.NewData(resp.BulkString, val)
 }
 
-func HandleSet(c *client.Client) {
+func HandleSet(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) < 2 {
-		c.RespChan <- resp.WrongArgs("set")
-		return
+		return resp.WrongArgs("set")
 	}
 	key := args[0]
 	val := args[1]
@@ -41,8 +37,7 @@ func HandleSet(c *client.Client) {
 		case "px", "ex":
 			exp, err := strconv.ParseInt(args[3], 10, 64)
 			if err != nil {
-				c.RespChan <- resp.Err("wrong expiry time expected a number")
-				return
+				return resp.Err("wrong expiry time expected a number")
 			}
 			if arg == "ex" {
 				expiry = exp * 1000
@@ -50,226 +45,193 @@ func HandleSet(c *client.Client) {
 				expiry = exp
 			}
 		default:
-			c.RespChan <- resp.Err("unknown argument for 'set' command")
-			return
+			return resp.Err("unknown argument for 'set' command")
 		}
 	}
 
-	server.Global.Store.Set(key, val, expiry)
-	c.RespChan <- resp.NewData(resp.String, "OK")
+	s.Store.Set(key, val, expiry)
+	s.Propagate(c.Command)
+	return resp.NewData(resp.String, "OK")
 }
 
-func HandleCmdIncr(c *client.Client) {
+func HandleCmdIncr(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) != 1 {
-		c.RespChan <- resp.WrongArgs("incr")
-		return
+		return resp.WrongArgs("incr")
 	}
 	key := args[0]
 
-	val, ok := server.Global.Store.Look(key)
+	val, ok := s.Store.Look(key)
 	if !ok {
-		server.Global.Store.Set(key, "1", 0)
-		c.RespChan <- resp.NewData(resp.Integer, 1)
-		return
+		s.Store.Set(key, "1", 0)
+		return resp.NewData(resp.Integer, 1)
 	}
 
 	str, err := store.As[string](val)
 	if err != nil {
-		c.RespChan <- resp.Err(err.Error())
-		return
+		return resp.Err(err.Error())
 	}
 
 	if i, err := strconv.Atoi(str); err == nil {
 		i += 1
-		server.Global.Store.Set(key, strconv.Itoa(i), val.ExpiryAt)
-		c.RespChan <- resp.NewData(resp.Integer, i)
+		s.Store.Set(key, strconv.Itoa(i), val.ExpiryAt)
+		return resp.NewData(resp.Integer, i)
 	} else {
-		c.RespChan <- resp.Err("value is not an integer or out of range")
+		return resp.Err("value is not an integer or out of range")
 	}
 }
 
-func HandleSubscribe(c *client.Client) {
+func HandleSubscribe(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) != 1 {
-		c.RespChan <- resp.WrongArgs("subscribe")
-		return
+		return resp.WrongArgs("subscribe")
 	}
 	channel := args[0]
 
 	client.Chans.Subscribe(c, channel)
 
-	c.RespChan <- resp.NewData(
+	return resp.NewData(
 		resp.Array,
 		[]string{"subscribe", channel},
 		resp.NewData(resp.Integer, c.SubscriptionCount()),
 	)
 }
 
-func HandlePublish(c *client.Client) {
+func HandlePublish(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) != 2 {
-		c.RespChan <- resp.WrongArgs("publish")
-		return
+		return resp.WrongArgs("publish")
 	}
 	channel := args[0]
 	message := args[1]
 
 	n := client.Chans.Publish(channel, message)
-	c.RespChan <- resp.NewData(resp.Integer, n)
+	return resp.NewData(resp.Integer, n)
 }
 
-func HandleUnsubscribe(c *client.Client) {
+func HandleUnsubscribe(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) != 1 {
-		c.RespChan <- resp.WrongArgs("unsubscribe")
-		return
+		return resp.WrongArgs("unsubscribe")
 	}
 	channel := args[0]
 	client.Chans.Unsubscribe(c, channel)
-	c.RespChan <- resp.NewData(resp.Array, "unsubscribe", channel, c.SubscriptionCount())
+	return resp.NewData(resp.Array, "unsubscribe", channel, c.SubscriptionCount())
 }
 
-func HandleType(c *client.Client) {
+func HandleType(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) != 1 {
-		c.RespChan <- resp.WrongArgs("type")
-		return
+		return resp.WrongArgs("type")
 	}
 	key := args[0]
 
-	t := server.Global.Store.Type(key)
-	c.RespChan <- resp.NewData(resp.String, t)
+	t := s.Store.Type(key)
+	return resp.NewData(resp.String, t)
 }
 
-func HandleConfig(c *client.Client) {
+func HandleConfig(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) < 2 {
-		c.RespChan <- resp.WrongArgs("config")
-		return
+		return resp.WrongArgs("config")
 	}
 
 	sub := strings.ToLower(args[0])
 
 	if sub == "get" {
-		configs, err := server.Global.Config.GetConfig(args[1:])
+		configs, err := s.Config.GetConfig(args[1:])
 		if err != nil {
-			c.RespChan <- resp.Err(err.Error())
-			return
+			return resp.Err(err.Error())
 		}
-		c.RespChan <- resp.NewData(resp.Array, configs)
-		return
+		return resp.NewData(resp.Array, configs)
 	}
-	c.RespChan <- resp.NewData(resp.Array)
+	return resp.NewData(resp.Array)
 }
 
-func HandleKeys(c *client.Client) {
+func HandleKeys(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) != 1 {
-		c.RespChan <- resp.WrongArgs("keys")
-		return
+		return resp.WrongArgs("keys")
 	}
 	pattern := args[0]
 
-	keys := server.Global.Store.Keys(pattern)
-	c.RespChan <- resp.NewData(resp.Array, keys)
+	keys := s.Store.Keys(pattern)
+	return resp.NewData(resp.Array, keys)
 }
 
-func HandleAuth(c *client.Client) {
+func HandleAuth(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) != 2 {
-		c.RespChan <- resp.WrongArgs("auth")
-		return
+		return resp.WrongArgs("auth")
 	}
 	res := client.Authenticate(c, args[0], args[1])
-	c.RespChan <- res
+	return res
 }
 
-func HandleACL(c *client.Client) {
+func HandleACL(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) == 0 {
-		c.RespChan <- resp.WrongArgs("acl")
-		return
+		return resp.WrongArgs("acl")
 	}
 
 	switch strings.ToLower(args[0]) {
 	case "whoami":
 		if len(args) != 1 {
-			c.RespChan <- resp.WrongArgs("acl|whoami")
-			return
+			return resp.WrongArgs("acl|whoami")
 		}
-		c.RespChan <- client.ACL_WHOAMI()
+		return client.ACL_WHOAMI()
 
 	case "getuser":
 		if len(args) != 2 {
-			c.RespChan <- resp.WrongArgs("acl|getuser")
-			return
+			return resp.WrongArgs("acl|getuser")
 		}
-		c.RespChan <- client.ACL_GETUSER(args[1])
+		return client.ACL_GETUSER(args[1])
 
 	case "setuser":
 		if len(args) != 3 {
-			c.RespChan <- resp.WrongArgs("acl|setuser")
-			return
+			return resp.WrongArgs("acl|setuser")
 		}
-		c.RespChan <- client.ACL_SETUSER(args[1], args[2])
+		return client.ACL_SETUSER(args[1], args[2])
 
 	default:
-		c.RespChan <- resp.Err("unknown subcommand '" + args[0] + "'")
+		return resp.Err("unknown subcommand '" + args[0] + "'")
 	}
 }
 
-func HandleInfo(c *client.Client) {
+func HandleInfo(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) == 0 {
-		c.RespChan <- resp.WrongArgs("info")
-		return
+		return resp.WrongArgs("info")
 	}
 
 	switch strings.ToLower(args[0]) {
 	case "replication":
 		if len(args) != 1 {
-			c.RespChan <- resp.WrongArgs("info|replication")
-			return
+			return resp.WrongArgs("info|replication")
 		}
 		reply := strings.Join([]string{
-			"role:" + server.Global.Role,
-			"master_replid:" + server.Global.ReplicationId,
-			"master_repl_offset:" + strconv.Itoa(server.Global.ReplicationOffset),
+			"role:" + s.Role.String(),
+			"master_replid:" + s.ReplicationId,
+			"master_repl_offset:" + strconv.Itoa(s.ReplicationOffset),
 		}, "\n")
-		c.RespChan <- resp.NewData(resp.BulkString, reply)
+		return resp.NewData(resp.BulkString, reply)
 
 	default:
-		c.RespChan <- resp.Err("unsupported/unknown subcommand '" + args[0] + "'")
+		return resp.Err("unsupported/unknown subcommand '" + args[0] + "'")
 	}
 }
 
-func HandleReplconf(c *client.Client) {
+func HandleReplconf(c *client.Client) resp.Data {
 	// args := c.Command.Args
-	c.RespChan <- resp.NewData(resp.String, "OK")
+	return resp.NewData(resp.String, "OK")
 }
 
-func HandlePsync(c *client.Client) {
+func HandlePsync(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) != 2 {
-		c.RespChan <- resp.WrongArgs("psync")
-		return
+		return resp.WrongArgs("psync")
 	}
 
-	var sendRDB bool
-	str := []string{"FULLRESYNC"}
-	if args[0] == "?" {
-		str = append(str, server.Global.ReplicationId)
-		sendRDB = true
-	}
-	if args[1] == "-1" {
-		str = append(str, strconv.Itoa(server.Global.ReplicationOffset))
-		sendRDB = true
-	}
-
-	res := resp.NewData(resp.String, strings.Join(str, " "))
-	c.Conn.Write(res.ToResponse())
-	if sendRDB {
-		c.SendRDB()
-	}
+	s.NewReplica(c)
+	return resp.None()
 }
