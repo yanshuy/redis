@@ -77,10 +77,11 @@ func (s *Server) Run(handleConn func(net.Conn)) {
 	}
 
 	if s.Role == client.SLAVE {
-		err := s.HandshakeMaster()
+		conn, err := s.HandshakeMaster()
 		if err != nil {
 			log.Fatal(err)
 		}
+		go handleConn(conn)
 	}
 
 	for {
