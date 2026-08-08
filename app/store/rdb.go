@@ -108,7 +108,7 @@ func SaveRDBSnapshot(rs *RedisStore) (err error) {
 			continue
 		}
 		if value.Type != STRING {
-			log.Println("ignoring type other than string")
+			fmt.Println("ignoring type other than string")
 			continue
 		}
 		if value.ExpiryAt != 0 {
@@ -214,19 +214,12 @@ func decodeLength(b []byte) (int, int, bool) {
 		return int(l), 5, true
 
 	default:
-		log.Println("special case not supported")
+		fmt.Println("special case not supported")
 		return 0, 0, false
 	}
 }
 
-const (
-	header   = 0
-	metadata = 1
-	database = 2
-	keyVals  = 3
-)
-
-func RestoreRDBSnapshot(rs *RedisStore) (err error) {
+func RestoreRDBSnapshot(rs *RedisStore) error {
 	file, err := rs.GetRDBFile(os.O_RDONLY | os.O_CREATE)
 	if err != nil {
 		return nil
@@ -241,156 +234,31 @@ func RestoreRDBSnapshot(rs *RedisStore) (err error) {
 		return nil
 	}
 
-	state := header
-	StateMachine := func(b []byte) (n int, err error) {
-		defer recover()
-
-	loop:
-		for len(b) > 0 {
-			fmt.Println(len(b), state)
-			if b[0] == FF {
-				n += 1
-				return n, nil
-			}
-			switch state {
-			case header:
-				i := bytes.IndexByte(b, FA)
-				if i == -1 {
-					return 0, nil
-				}
-				headers := string(b[:i])
-				if !strings.Contains(headers, "REDIS0011") {
-					return i, fmt.Errorf("unsupported format or version")
-				}
-				b = b[i+1:]
-				n += i + 1
-				state = metadata
-
-			case metadata:
-				i := bytes.IndexByte(b, FE)
-				if i == -1 {
-					break loop
-				}
-				metadata := string(b[:i])
-				log.Println("read metadata:", "t", metadata, "t")
-
-				b = b[i+1:]
-				n += i + 1
-				state = database
-
-			case database:
-				if len(b) < 2 {
-					break loop
-				}
-				dbIndex := uint8(b[0])
-				log.Println("db index is:", dbIndex)
-
-				if b[1] != FB {
-					log.Println("no FB")
-					break loop
-				}
-				i := 2
-
-				tl, used, ok := decodeLength(b[i:])
-				if !ok {
-					break loop
-				}
-				log.Println("table len:", tl)
-				i += used
-
-				etl, used, ok := decodeLength(b[i:])
-				if !ok {
-					break loop
-				}
-				log.Println("table len:", etl)
-				i += used
-
-				n += i
-				b = b[i:]
-				state = keyVals
-
-			case keyVals:
-				i := 0
-				var expiry uint64
-				if b[i] == FC {
-					log.Println("got FC")
-					i += 1
-					if len(b) < i+8 {
-						break loop
-					}
-					expiry = binary.LittleEndian.Uint64(b[i : i+8])
-					i += 8
-				} else if b[i] == FD {
-					i += 1
-					log.Println("got FD")
-					if len(b) < i+8 {
-						break loop
-					}
-					sec := binary.LittleEndian.Uint32(b[i : i+4])
-					expiry = uint64(sec) * 1000
-					i += 4
-				}
-				if len(b) < i+1 {
-					break loop
-				}
-
-				valType := b[i]
-				i += 1
-				fmt.Println("hi", string(b[i:]))
-
-				switch valType {
-				case byte(STRING):
-					kLen, used, ok := decodeLength(b[i:])
-					if !ok {
-						break loop
-					}
-					i += used
-					if len(b) < i+kLen {
-						break loop
-					}
-					keyBytes := b[i : i+kLen]
-					i += kLen
-
-					vLen, used, ok := decodeLength(b[i:])
-					if !ok {
-						break loop
-					}
-					i += used
-					if len(b) < i+vLen {
-						break loop
-					}
-					valBytes := b[i : i+vLen]
-					i += vLen
-
-					rs.Store[string(keyBytes)] = &Value{
-						Type:     STRING,
-						Obj:      string(valBytes),
-						ExpiryAt: int64(expiry),
-					}
-					fmt.Println(rs.Store[string(keyBytes)])
-
-				default:
-					return i, fmt.Errorf("unsupported value type: 0x%02X", valType)
-				}
-				n += i
-				b = b[i:]
-			}
-		}
-		return n, nil
+	err = ReadRDB(file, 4096, rs)
+	if err != nil {
+		return err
 	}
+	return nil
+}
 
-	buf := make([]byte, 4096)
+func ReadRDB(reader io.Reader, rdbLen int, rs *RedisStore) error {
+	sm := StateMachince{state: header, rs: rs}
+
+	buf := make([]byte, rdbLen)
 	bufLen := 0
-	for {
-		n, err := file.Read(buf[bufLen:])
+	totalRead := 0
+
+	for totalRead < rdbLen {
+		n, err := reader.Read(buf[bufLen:])
 		if n > 0 {
 			bufLen += n
-			o, err := StateMachine(buf[:bufLen])
+			totalRead += n
+			o, err := sm.StateMachine(buf[:bufLen])
 			if err != nil {
 				return err
 			}
 			if o > 0 {
-				copy(buf, buf[o:n])
+				copy(buf, buf[o:bufLen])
 				bufLen -= o
 			}
 		}
@@ -403,6 +271,156 @@ func RestoreRDBSnapshot(rs *RedisStore) (err error) {
 		}
 	}
 	return nil
+}
+
+type State int
+
+const (
+	header State = iota
+	metadata
+	database
+	keyVals
+)
+
+type StateMachince struct {
+	state State
+	rs    *RedisStore
+}
+
+func (sm *StateMachince) StateMachine(b []byte) (n int, err error) {
+	defer recover()
+
+loop:
+	for len(b) > 0 {
+		if b[0] == FF {
+			n += 1
+			return n, nil
+		}
+		switch sm.state {
+		case header:
+			i := bytes.IndexByte(b, FA)
+			if i == -1 {
+				return 0, nil
+			}
+			headers := string(b[:i])
+			if !strings.Contains(headers, "REDIS0011") {
+				return i, fmt.Errorf("unsupported format or version")
+			}
+			b = b[i+1:]
+			n += i + 1
+			sm.state = metadata
+
+		case metadata:
+			i := bytes.IndexByte(b, FE)
+			if i == -1 {
+				break loop
+			}
+			metadata := string(b[:i])
+			fmt.Println("read metadata:", "t", metadata, "t")
+
+			b = b[i+1:]
+			n += i + 1
+			sm.state = database
+
+		case database:
+			if len(b) < 2 {
+				break loop
+			}
+			dbIndex := uint8(b[0])
+			fmt.Println("db index is:", dbIndex)
+
+			if b[1] != FB {
+				fmt.Println("no FB")
+				break loop
+			}
+			i := 2
+
+			tl, used, ok := decodeLength(b[i:])
+			if !ok {
+				break loop
+			}
+			fmt.Println("table len:", tl)
+			i += used
+
+			etl, used, ok := decodeLength(b[i:])
+			if !ok {
+				break loop
+			}
+			fmt.Println("table len:", etl)
+			i += used
+
+			n += i
+			b = b[i:]
+			sm.state = keyVals
+
+		case keyVals:
+			i := 0
+			var expiry uint64
+			if b[i] == FC {
+				fmt.Println("got FC")
+				i += 1
+				if len(b) < i+8 {
+					break loop
+				}
+				expiry = binary.LittleEndian.Uint64(b[i : i+8])
+				i += 8
+			} else if b[i] == FD {
+				i += 1
+				fmt.Println("got FD")
+				if len(b) < i+8 {
+					break loop
+				}
+				sec := binary.LittleEndian.Uint32(b[i : i+4])
+				expiry = uint64(sec) * 1000
+				i += 4
+			}
+			if len(b) < i+1 {
+				break loop
+			}
+
+			valType := b[i]
+			i += 1
+			fmt.Println("hi", string(b[i:]))
+
+			switch valType {
+			case byte(STRING):
+				kLen, used, ok := decodeLength(b[i:])
+				if !ok {
+					break loop
+				}
+				i += used
+				if len(b) < i+kLen {
+					break loop
+				}
+				keyBytes := b[i : i+kLen]
+				i += kLen
+
+				vLen, used, ok := decodeLength(b[i:])
+				if !ok {
+					break loop
+				}
+				i += used
+				if len(b) < i+vLen {
+					break loop
+				}
+				valBytes := b[i : i+vLen]
+				i += vLen
+
+				sm.rs.Store[string(keyBytes)] = &Value{
+					Type:     STRING,
+					Obj:      string(valBytes),
+					ExpiryAt: int64(expiry),
+				}
+				fmt.Println(sm.rs.Store[string(keyBytes)])
+
+			default:
+				return i, fmt.Errorf("unsupported value type: 0x%02X", valType)
+			}
+			n += i
+			b = b[i:]
+		}
+	}
+	return n, nil
 }
 
 var RDB, _ = hex.DecodeString("524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2")

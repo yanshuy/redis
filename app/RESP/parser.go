@@ -8,6 +8,8 @@ import (
 
 var CRLF = []byte("\r\n")
 
+const MaxBulkStringSize = 512 * 1024 * 1024
+
 // returns (value, consumedBytes, error).
 // If data is incomplete, returns (zeroValue, 0, nil).
 func Parse(b []byte) (r Data, n int, err error) {
@@ -17,7 +19,7 @@ func Parse(b []byte) (r Data, n int, err error) {
 
 	d, o, err := R(b[n:])
 	if err != nil {
-		return r, 0, err
+		return d, 0, err
 	}
 	n += o
 
@@ -41,10 +43,21 @@ func R(b []byte) (d Data, n int, err error) {
 		d.Int = num
 
 	case BulkString:
-		l, _ := strconv.Atoi(string(b[1:i]))
-		// TODO: max l 512MB
+		l, err := strconv.Atoi(string(b[1:i]))
+		if err != nil {
+			return d, 0, err
+		}
+		if len(b) < next+l+2 || len(b) > MaxBulkStringSize {
+			return d, 0, nil // incomplete
+		}
+
 		d.Str = string(b[next : next+l])
-		next += l + len(CRLF)
+		next += l
+
+		if !bytes.Equal(b[next:next+2], CRLF) {
+			return d, 0, errors.New("invalid bulk string terminator")
+		}
+		next += 2
 
 	case Array:
 		l, _ := strconv.Atoi(string(b[1:i]))
@@ -64,4 +77,16 @@ func R(b []byte) (d Data, n int, err error) {
 	}
 
 	return d, next, nil
+}
+
+func ReadBulkLength(b []byte) (len int, n int, err error) {
+	i := bytes.Index(b, CRLF)
+	if i == -1 {
+		return 0, 0, errors.New("No CRLF terminator")
+	}
+	l, err := strconv.Atoi(string(b[1:i]))
+	if err != nil {
+		return 0, 0, err
+	}
+	return l, i + 2, nil
 }

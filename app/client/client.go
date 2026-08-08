@@ -31,6 +31,7 @@ type Client struct {
 	Blocked  bool
 	Unblock  chan struct{}
 	respChan chan resp.Data
+	Reader   *Reader
 }
 
 func NewClient(conn net.Conn) *Client {
@@ -41,12 +42,13 @@ func NewClient(conn net.Conn) *Client {
 
 	c := &Client{
 		Conn:          conn,
-		Role:          MASTER,
+		Role:          USER,
 		authAsUser:    user,
 		subscriptions: make(Set[string]),
 		messageChan:   make(chan PubMessage),
 		WatchingKeys:  make(Set[string]),
 		respChan:      make(chan resp.Data, 100),
+		Reader:        NewReader(),
 	}
 	go c.ListenMessages()
 	return c
@@ -111,6 +113,8 @@ type Role int
 
 func (r Role) String() string {
 	switch r {
+	case USER:
+		return "user"
 	case MASTER:
 		return "master"
 	case SLAVE:
@@ -121,7 +125,8 @@ func (r Role) String() string {
 }
 
 const (
-	SLAVE Role = iota
+	USER Role = iota
+	SLAVE
 	MASTER
 )
 

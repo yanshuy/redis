@@ -68,7 +68,7 @@ func Init() *Server {
 	return Global
 }
 
-func (s *Server) Run(handleConn func(net.Conn)) {
+func (s *Server) Run(handleConn func(c *client.Client)) {
 	port := s.Config.port
 
 	l, err := net.Listen("tcp", "0.0.0.0:"+port)
@@ -77,11 +77,11 @@ func (s *Server) Run(handleConn func(net.Conn)) {
 	}
 
 	if s.Role == client.SLAVE {
-		conn, err := s.HandshakeMaster()
+		master, err := s.HandshakeMaster()
 		if err != nil {
 			log.Fatal(err)
 		}
-		go handleConn(conn)
+		go handleConn(master)
 	}
 
 	for {
@@ -90,17 +90,17 @@ func (s *Server) Run(handleConn func(net.Conn)) {
 			fmt.Println("Error accepting connection: ", err.Error())
 			continue
 		}
-		go handleConn(conn)
+		c := client.NewClient(conn)
+		go handleConn(c)
 	}
 }
 
-func HandleConnection(conn net.Conn, cmdChan chan<- *client.Client) {
-	defer conn.Close()
+func HandleClient(c *client.Client, reqChan chan<- Request) {
+	defer c.Close()
 
-	c := client.NewClient(conn)
 	go c.WriteLoop()
 
-	err := ReadRequests(c, cmdChan)
+	err := ReadRequests(c, reqChan)
 	if err != nil {
 		log.Println("error reading", err)
 	}

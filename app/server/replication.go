@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 
@@ -31,12 +32,14 @@ func (s *Server) NewReplica(c *client.Client) error {
 }
 
 func (s *Server) Propagate(cmd client.Command) {
-	for _, client := range s.replicas {
-		client.QueueMessage(cmd.ToRESP())
+	if s.Role == client.MASTER {
+		for _, client := range s.replicas {
+			client.QueueMessage(cmd.ToRESP())
+		}
 	}
 }
 
-func (s *Server) HandshakeMaster() (net.Conn, error) {
+func (s *Server) HandshakeMaster() (*client.Client, error) {
 	parts := strings.Fields(s.replicaof)
 	host := parts[0]
 	port := parts[1]
@@ -46,23 +49,23 @@ func (s *Server) HandshakeMaster() (net.Conn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to master at %s: %w", address, err)
 	}
-
-	r := NewReader()
+	c := client.NewClient(conn)
+	c.Role = client.MASTER
 
 	ping := resp.NewData(resp.Array, []string{"PING"})
-	err = r.exchange(conn, ping, "PONG")
+	err = c.Reader.Exchange(conn, ping, "PONG")
 	if err != nil {
 		return nil, err
 	}
 
 	listening_port := resp.NewData(resp.Array, []string{"REPLCONF", "listening-port", s.Config.port})
-	err = r.exchange(conn, listening_port, "OK")
+	err = c.Reader.Exchange(conn, listening_port, "OK")
 	if err != nil {
 		return nil, err
 	}
 
 	capa := resp.NewData(resp.Array, []string{"REPLCONF", "capa", "psync2"})
-	err = r.exchange(conn, capa, "OK")
+	err = c.Reader.Exchange(conn, capa, "OK")
 	if err != nil {
 		return nil, err
 	}
@@ -72,14 +75,25 @@ func (s *Server) HandshakeMaster() (net.Conn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to send message to peer")
 	}
-	resync, err := r.ReadRESP(conn)
+
+	resync, err := c.Reader.ReadRESP(conn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read message from peer")
 	}
 	fields := strings.Fields(resync.Str)
 	repl_id := fields[1]
 	repl_off := fields[2]
-	fmt.Print(repl_id, " offset: ", repl_off)
+	fmt.Print(repl_id, " offset: ", repl_off, "\n")
 
-	return conn, nil
+	file, err := s.Store.GetRDBFile(os.O_CREATE | os.O_WRONLY | os.O_TRUNC)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	err = c.Reader.SaveRDB(conn, file)
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }

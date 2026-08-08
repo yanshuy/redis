@@ -2,28 +2,35 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
 )
 
-func ReadRequests(c *client.Client, cmdChan chan<- *client.Client) error {
-	r := NewReader()
+type Request struct {
+	Client *client.Client
+	Cmd    client.Command
+}
+
+func ReadRequests(c *client.Client, reqChan chan<- Request) error {
 	for {
 		if c.Blocked {
 			<-c.Unblock
 		}
-		d, err := r.ReadRESP(c.Conn)
+		d, err := c.Reader.ReadRESP(c.Conn)
 		if err != nil {
 			return err
 		}
 		cmd, err := ValidateCommand(d)
+		if Global.Role == client.SLAVE {
+			fmt.Printf("slave got:%s\n", cmd.Name)
+		}
 		if err != nil {
 			return err
 		}
-		c.Command = cmd
-		cmdChan <- c
+		reqChan <- Request{Client: c, Cmd: cmd}
 	}
 }
 

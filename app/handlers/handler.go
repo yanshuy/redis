@@ -14,11 +14,18 @@ var s *server.Server
 
 var handler = Chain(HandleCmd, Auth, SubscribeMode, Multi)
 
-func HandleRequest(c *client.Client) {
+func HandleRequest(req server.Request) {
 	s = server.Global // crime
 
+	c := req.Client
+	c.Command = req.Cmd
+
+	fmt.Println(c.Role.String())
+
 	res := handler(c)
-	c.QueueMessage(res)
+	if c.Role != client.MASTER {
+		c.QueueMessage(res)
+	}
 }
 
 func HandleCmd(c *client.Client) resp.Data {
