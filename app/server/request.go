@@ -2,7 +2,6 @@ package server
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
@@ -24,9 +23,6 @@ func ReadRequests(c *client.Client, reqChan chan<- Request) error {
 			return err
 		}
 		cmd, err := ValidateCommand(d)
-		if Global.Role == client.SLAVE {
-			fmt.Printf("slave got:%s\n", cmd.Name)
-		}
 		if err != nil {
 			return err
 		}

@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strconv"
@@ -90,7 +91,8 @@ func (s *Server) HandshakeMaster() (*client.Client, error) {
 		return nil, err
 	}
 	defer file.Close()
-	err = c.Reader.SaveRDB(conn, file)
+
+	err = c.Reader.SaveRDB(conn, io.Discard)
 	if err != nil {
 		return nil, err
 	}

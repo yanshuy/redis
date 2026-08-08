@@ -20,8 +20,6 @@ func HandleRequest(req server.Request) {
 	c := req.Client
 	c.Command = req.Cmd
 
-	fmt.Println(c.Role.String())
-
 	res := handler(c)
 	if c.Role != client.MASTER {
 		c.QueueMessage(res)

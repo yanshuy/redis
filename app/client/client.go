@@ -42,7 +42,7 @@ func NewClient(conn net.Conn) *Client {
 
 	c := &Client{
 		Conn:          conn,
-		Role:          USER,
+		Role:          CLIENT,
 		authAsUser:    user,
 		subscriptions: make(Set[string]),
 		messageChan:   make(chan PubMessage),
@@ -113,8 +113,8 @@ type Role int
 
 func (r Role) String() string {
 	switch r {
-	case USER:
-		return "user"
+	case CLIENT:
+		return "client"
 	case MASTER:
 		return "master"
 	case SLAVE:
@@ -125,7 +125,7 @@ func (r Role) String() string {
 }
 
 const (
-	USER Role = iota
+	CLIENT Role = iota
 	SLAVE
 	MASTER
 )

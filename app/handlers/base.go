@@ -222,7 +222,17 @@ func HandleInfo(c *client.Client) resp.Data {
 }
 
 func HandleReplconf(c *client.Client) resp.Data {
-	// args := c.Command.Args
+	args := c.Command.Args
+	if len(args) < 1 {
+		return resp.WrongArgs("replconf")
+	}
+	sub := strings.ToLower(args[0])
+	switch sub {
+	case "getack":
+		res := resp.NewData(resp.Array, []string{"REPLCONF", "ACK", "0"})
+		c.QueueMessage(res)
+		return resp.None()
+	}
 	return resp.NewData(resp.String, "OK")
 }
 
