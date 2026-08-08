@@ -6,7 +6,6 @@ import (
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
-	"github.com/codecrafters-io/redis-starter-go/app/server"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
@@ -17,7 +16,7 @@ func HandleRpush(c *client.Client) resp.Data {
 	}
 	key := args[0]
 
-	l, err := server.Global.Store.Rpush(key, args[1:])
+	l, err := s.Store.Rpush(key, args[1:])
 	if err != nil {
 		return resp.Err(err.Error())
 	}
@@ -31,7 +30,7 @@ func HandleLpush(c *client.Client) resp.Data {
 	}
 	key := args[0]
 
-	l, err := server.Global.Store.Lpush(key, args[1:])
+	l, err := s.Store.Lpush(key, args[1:])
 	if err != nil {
 		return resp.Err(err.Error())
 	}
@@ -55,7 +54,7 @@ func HandleLpop(c *client.Client) resp.Data {
 		}
 		pops = p
 	}
-	l, err := server.Global.Store.Lpop(key, pops)
+	l, err := s.Store.Lpop(key, pops)
 	if err != nil {
 		return resp.Err(err.Error())
 	}
@@ -77,7 +76,7 @@ func HandleLlen(c *client.Client) resp.Data {
 	}
 	key := args[0]
 
-	l, err := server.Global.Store.Llen(key)
+	l, err := s.Store.Llen(key)
 	if err != nil {
 		return resp.Err(err.Error())
 	}
@@ -98,7 +97,7 @@ func HandleLrange(c *client.Client) resp.Data {
 	if err != nil {
 		return resp.Err("expected end index to be an integer for 'lrange' command")
 	}
-	elems, err := server.Global.Store.Lrange(key, startIdx, endIdx)
+	elems, err := s.Store.Lrange(key, startIdx, endIdx)
 	if err != nil {
 		return resp.Err(err.Error())
 	}
@@ -122,7 +121,7 @@ func HandleBlpop(c *client.Client) resp.Data {
 	}
 
 	for _, key := range keys {
-		popped, err := server.Global.Store.Lpop(key, 1)
+		popped, err := s.Store.Lpop(key, 1)
 		if err != nil {
 			return resp.Err(err.Error())
 		}
@@ -133,7 +132,7 @@ func HandleBlpop(c *client.Client) resp.Data {
 
 	result := make(chan store.BlockResult, 1)
 	for _, key := range keys {
-		server.Global.Store.BlockedKeys[key] = append(server.Global.Store.BlockedKeys[key], result)
+		s.Store.BlockedKeys[key] = append(s.Store.BlockedKeys[key], result)
 	}
 
 	go func() {
