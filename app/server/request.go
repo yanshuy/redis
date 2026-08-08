@@ -11,6 +11,7 @@ import (
 type Request struct {
 	Client *client.Client
 	Cmd    client.Command
+	CmdLen int
 }
 
 func ReadRequests(c *client.Client, reqChan chan<- Request) error {
@@ -18,7 +19,7 @@ func ReadRequests(c *client.Client, reqChan chan<- Request) error {
 		if c.Blocked {
 			<-c.Unblock
 		}
-		d, err := c.Reader.ReadRESP(c.Conn)
+		d, cmdLen, err := c.Reader.ReadRESP(c.Conn)
 		if err != nil {
 			return err
 		}
@@ -26,7 +27,7 @@ func ReadRequests(c *client.Client, reqChan chan<- Request) error {
 		if err != nil {
 			return err
 		}
-		reqChan <- Request{Client: c, Cmd: cmd}
+		reqChan <- Request{Client: c, Cmd: cmd, CmdLen: cmdLen}
 	}
 }
 

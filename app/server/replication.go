@@ -77,7 +77,7 @@ func (s *Server) HandshakeMaster() (*client.Client, error) {
 		return nil, fmt.Errorf("failed to send message to peer")
 	}
 
-	resync, err := c.Reader.ReadRESP(conn)
+	resync, _, err := c.Reader.ReadRESP(conn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read message from peer")
 	}

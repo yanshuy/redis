@@ -21,7 +21,9 @@ func HandleRequest(req server.Request) {
 	c.Command = req.Cmd
 
 	res := handler(c)
-	if c.Role != client.MASTER {
+	if c.Role == client.MASTER {
+		s.ReplicationOffset += req.CmdLen
+	} else {
 		c.QueueMessage(res)
 	}
 }

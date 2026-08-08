@@ -229,7 +229,8 @@ func HandleReplconf(c *client.Client) resp.Data {
 	sub := strings.ToLower(args[0])
 	switch sub {
 	case "getack":
-		res := resp.NewData(resp.Array, []string{"REPLCONF", "ACK", "0"})
+		off := strconv.Itoa(s.ReplicationOffset)
+		res := resp.NewData(resp.Array, []string{"REPLCONF", "ACK", off})
 		c.QueueMessage(res)
 		return resp.None()
 	}

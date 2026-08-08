@@ -22,31 +22,30 @@ func NewReader() *Reader {
 	}
 }
 
-func (r *Reader) ReadRESP(conn io.Reader) (resp.Data, error) {
+func (r *Reader) ReadRESP(conn io.Reader) (resp.Data, int, error) {
 	b := r.buf
 
 	for {
 		if r.off > 0 {
 			req, o, err := resp.Parse(b[:r.off])
 			if err != nil {
-				return req, err
+				return req, 0, err
 			}
 			if o > 0 {
 				copy(b, b[o:r.off])
 				r.off -= o
-				return req, nil
+				return req, o, nil
 			}
 		}
 
 		if r.off == len(b) {
-			return resp.Data{}, errors.New("request too large")
+			return resp.Data{}, 0, errors.New("request too large")
 		}
 
 		n, err := conn.Read(b[r.off:])
 		r.off += n
-
 		if err != nil {
-			return resp.Data{}, err
+			return resp.Data{}, 0, err
 		}
 	}
 }
@@ -56,7 +55,7 @@ func (r *Reader) Exchange(conn net.Conn, out resp.Data, expected string) error {
 	if err != nil {
 		return fmt.Errorf("failed to send message to peer")
 	}
-	resp, err := r.ReadRESP(conn)
+	resp, _, err := r.ReadRESP(conn)
 	if err != nil {
 		return fmt.Errorf("failed to read message from peer")
 	}
