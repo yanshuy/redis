@@ -30,6 +30,10 @@ type Server struct {
 	replicas []*client.Client
 }
 
+func (s *Server) ReplicaCount() int {
+	return len(s.replicas)
+}
+
 var Global *Server
 
 func NewServer(config Config, store *store.RedisStore) *Server {

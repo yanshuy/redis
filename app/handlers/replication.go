@@ -41,6 +41,10 @@ func HandleWait(c *client.Client) resp.Data {
 		return resp.WrongArgs("wait")
 	}
 
+	if s.ReplicationOffset == 0 {
+		return resp.NewData(resp.Integer, s.ReplicaCount())
+	}
+
 	n := len(args)
 	timeout_s, err := strconv.ParseFloat(args[n-1], 64)
 	if err != nil {
