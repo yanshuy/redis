@@ -13,21 +13,19 @@ type Request struct {
 	CmdLen int
 }
 
-func (c *Client) ReadRequests(reqChan chan<- Request) error {
-	for {
-		if c.Blocked {
-			<-c.Unblock
-		}
-		d, cmdLen, err := c.Reader.ReadRESP(c.Conn)
-		if err != nil {
-			return err
-		}
-		cmd, err := ValidateCommand(d)
-		if err != nil {
-			return err
-		}
-		reqChan <- Request{Client: c, Cmd: cmd, CmdLen: cmdLen}
+func (c *Client) ReadRequest() (Request, error) {
+	if c.Blocked {
+		<-c.Unblock
 	}
+	d, cmdLen, err := c.Reader.ReadRESP(c.Conn)
+	if err != nil {
+		return Request{}, err
+	}
+	cmd, err := ValidateCommand(d)
+	if err != nil {
+		return Request{}, err
+	}
+	return Request{Client: c, Cmd: cmd, CmdLen: cmdLen}, nil
 }
 
 func ValidateCommand(req resp.Data) (Command, error) {

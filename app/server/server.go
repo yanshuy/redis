@@ -13,6 +13,11 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
+var (
+	MASTER = client.MASTER
+	SLAVE  = client.SLAVE
+)
+
 type Config struct {
 	port       string
 	Dir        string
@@ -25,9 +30,22 @@ type Server struct {
 	ReplicationId     string
 	ReplicationOffset int
 
-	Config   Config
-	Store    *store.RedisStore
-	replicas []*client.Client
+	Config       Config
+	Store        *store.RedisStore
+	replicas     []*client.Client
+	AckListeners map[*client.Client]chan AckMessage
+}
+
+type AckMessage struct {
+	Slave  *client.Client
+	Offset int
+}
+
+func NewAck(c *client.Client, off int) AckMessage {
+	return AckMessage{
+		Slave:  c,
+		Offset: off,
+	}
 }
 
 func (s *Server) ReplicaCount() int {
@@ -36,13 +54,16 @@ func (s *Server) ReplicaCount() int {
 
 var Global *Server
 
-func NewServer(config Config, store *store.RedisStore) *Server {
-	return &Server{
+func NewServer(role client.Role, config Config, store *store.RedisStore) *Server {
+	s := &Server{
 		Config:            config,
+		Role:              role,
 		Store:             store,
+		replicaof:         *replicaofFlag,
 		ReplicationId:     generateRandID(),
 		ReplicationOffset: 0,
 	}
+	return s
 }
 
 var (
@@ -61,13 +82,11 @@ func Init() *Server {
 		log.Fatal(err)
 	}
 
-	Global = NewServer(config, store)
-	replicaof := *replicaofFlag
-	if replicaof == "" {
-		Global.Role = client.MASTER
+	if *replicaofFlag == "" {
+		Global = NewServer(MASTER, config, store)
 	} else {
-		Global.Role = client.SLAVE
-		Global.replicaof = replicaof
+		Global = NewServer(SLAVE, config, store)
+
 	}
 	return Global
 }
@@ -94,17 +113,21 @@ func (s *Server) Run(handleConn func(c *client.Client)) {
 			fmt.Println("Error accepting connection: ", err.Error())
 			continue
 		}
-		c := client.NewClient(conn)
+		c := client.NewClient(conn, client.CLIENT)
 		go handleConn(c)
 	}
 }
 
-func HandleClient(c *client.Client, reqChan chan<- client.Request) {
+func HandleRequests(c *client.Client, reqChan chan<- client.Request) {
 	defer c.Close()
 
-	err := c.ReadRequests(reqChan)
-	if err != nil {
-		log.Println("error reading", err)
+	for {
+		req, err := c.ReadRequest()
+		if err != nil {
+			log.Println("error reading", err)
+			return
+		}
+		reqChan <- req
 	}
 }
 

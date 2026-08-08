@@ -14,35 +14,77 @@ import (
 )
 
 func (s *Server) NewReplica(c *client.Client) error {
-	c.Role = client.SLAVE
-	c.CloseMessageChan()
+	c.MakeSlave()
+	Global.replicas = append(Global.replicas, c)
 
 	str := []string{"FULLRESYNC", Global.ReplicationId, strconv.Itoa(Global.ReplicationOffset)}
 	res := resp.NewData(resp.String, strings.Join(str, " "))
 
-	_, err := c.Conn.Write(res.ToResponse())
-	if err != nil {
-		return fmt.Errorf("failed to send message to peer")
-	}
+	go func() {
+		c.Block()
 
-	store.SendRDB(c)
-	//TODO: handle error
+		c.Conn.Write(res.ToResponse())
+		store.SendRDB(c)
+		//TODO: handle error
 
-	Global.replicas = append(Global.replicas, c)
+		c.UnBlock()
+	}()
+
 	return nil
 }
 
 func (s *Server) Propagate(cmd client.Command) {
 	if s.Role == client.MASTER {
+		cmd := cmd.ToRESP()
+		raw := cmd.ToResponse()
+		s.ReplicationOffset += len(raw)
 		go func() {
-			cmd := cmd.ToRESP()
-			raw := cmd.ToResponse()
 			for _, client := range s.replicas {
 				client.Conn.Write(raw)
 			}
-			s.ReplicationOffset += len(raw)
 		}()
 	}
+}
+
+func (s *Server) RequestAcks() chan AckMessage {
+	ch := make(chan AckMessage, s.ReplicaCount())
+
+	getack := resp.NewData(resp.Array, []string{"REPLCONF", "GETACK", "*"})
+	b := getack.ToResponse()
+
+	for _, slave := range s.replicas {
+		go func() {
+			slave.Block()
+
+			_, err := slave.Conn.Write(b)
+			if err != nil {
+				return
+			}
+
+		read:
+			resp, _, err := slave.Reader.ReadRESP(slave.Conn)
+			if err != nil {
+				return
+			}
+			cmd, err := client.ValidateCommand(resp)
+			if err != nil {
+				return
+			}
+			if cmd.Name != "replconf" || len(cmd.Args) != 2 ||
+				strings.ToLower(cmd.Args[0]) != "ack" {
+				goto read
+			}
+			off, err := strconv.Atoi(cmd.Args[1])
+			if err != nil || off < 0 {
+				return
+			}
+
+			ch <- NewAck(slave, off)
+
+			slave.UnBlock()
+		}()
+	}
+	return ch
 }
 
 func (s *Server) HandshakeMaster() (*client.Client, error) {
@@ -55,8 +97,7 @@ func (s *Server) HandshakeMaster() (*client.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to master at %s: %w", address, err)
 	}
-	c := client.NewClient(conn)
-	c.Role = client.MASTER
+	c := client.NewClient(conn, client.MASTER)
 
 	ping := resp.NewData(resp.Array, []string{"PING"})
 	err = c.Reader.Exchange(conn, ping, "PONG")

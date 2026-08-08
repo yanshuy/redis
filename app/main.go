@@ -13,7 +13,7 @@ func main() {
 	go CommandLoop(s, reqChan)
 
 	s.Run(func(c *client.Client) {
-		server.HandleClient(c, reqChan)
+		server.HandleRequests(c, reqChan)
 	})
 }
 

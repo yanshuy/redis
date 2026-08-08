@@ -135,8 +135,8 @@ func HandleBlpop(c *client.Client) resp.Data {
 		s.Store.BlockedKeys[key] = append(s.Store.BlockedKeys[key], result)
 	}
 
+	c.Block()
 	go func() {
-		c.Block()
 		var timeout <-chan time.Time
 		if timeout_s > 0 {
 			timeout = time.After(time.Duration(timeout_s * float64(time.Second)))

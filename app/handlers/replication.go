@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -17,11 +18,17 @@ func HandleReplconf(c *client.Client) resp.Data {
 	sub := strings.ToLower(args[0])
 	switch sub {
 	case "getack":
-		off := strconv.Itoa(s.ReplicationOffset)
-		res := resp.NewData(resp.Array, []string{"REPLCONF", "ACK", off})
-		c.QueueMessage(res)
+		if s.Role == client.SLAVE {
+			fmt.Println("got getack as a slave sendin", c.Role)
+			res := resp.NewData(resp.Array, []string{"REPLCONF", "ACK", strconv.Itoa(s.ReplicationOffset)})
+			c.QueueMessage(res) // because returned response are not sent if client is master
+		}
+		return resp.None()
+
+	case "ack":
 		return resp.None()
 	}
+
 	return resp.NewData(resp.String, "OK")
 }
 
@@ -41,34 +48,45 @@ func HandleWait(c *client.Client) resp.Data {
 		return resp.WrongArgs("wait")
 	}
 
+	numreplicas, err := strconv.Atoi(args[0])
+	if err != nil || numreplicas < 0 {
+		return resp.Err("numreplicas is not an integer or out of range")
+	}
+	if numreplicas == 0 {
+		return resp.NewData(resp.Integer, 0)
+	}
+	timeout_s, err := strconv.ParseFloat(args[1], 64)
+	if err != nil || timeout_s < 0 {
+		return resp.Err("timeout is not an integer or out of range")
+	}
+
 	if s.ReplicationOffset == 0 {
 		return resp.NewData(resp.Integer, s.ReplicaCount())
 	}
 
-	n := len(args)
-	timeout_s, err := strconv.ParseFloat(args[n-1], 64)
-	if err != nil {
-		return resp.Err("timeout is not an integer or out of range")
-	}
-	if timeout_s < 0 {
-		return resp.Err("timeout is negative")
-	}
+	targetOffset := s.ReplicationOffset
 
 	go func() {
 		var timeout <-chan time.Time
 		if timeout_s > 0 {
-			timeout = time.After(time.Duration(timeout_s * float64(time.Second)))
+			timeout = time.After(time.Duration(timeout_s * float64(time.Millisecond)))
 		}
-		_ = timeout
 
-		c.QueueMessage(resp.NewData(resp.Integer, 0))
-
-		// select {
-		// case msg := <-result:
-		// 	c.QueueMessage(resp.NewData(resp.Array, []string{msg.Key, msg.Value}))
-		// case <-timeout:
-		// 	c.QueueMessage(resp.NewData(resp.Integer, 0))
-		// }
+		ackChan := s.RequestAcks()
+		acksRev := 0
+	outer:
+		for acksRev < numreplicas {
+			select {
+			case ack := <-ackChan:
+				if ack.Offset >= targetOffset {
+					acksRev++
+				}
+			case <-timeout:
+				break outer
+			}
+		}
+		c.QueueMessage(resp.NewData(resp.Integer, acksRev))
 	}()
+
 	return resp.None()
 }

@@ -34,7 +34,7 @@ type Client struct {
 	Reader   *Reader
 }
 
-func NewClient(conn net.Conn) *Client {
+func NewClient(conn net.Conn, role Role) *Client {
 	var user *User
 	if DefaultUser.flags.Contains("nopass") {
 		user = DefaultUser
@@ -42,7 +42,7 @@ func NewClient(conn net.Conn) *Client {
 
 	c := &Client{
 		Conn:          conn,
-		Role:          CLIENT,
+		Role:          role,
 		authAsUser:    user,
 		subscriptions: make(Set[string]),
 		messageChan:   make(chan PubMessage),
@@ -50,9 +50,15 @@ func NewClient(conn net.Conn) *Client {
 		respChan:      make(chan resp.Data, 100),
 		Reader:        NewReader(),
 	}
+
 	go c.ListenMessages()
 	go c.WriteLoop()
 	return c
+}
+
+func (c *Client) MakeSlave() {
+	c.Role = SLAVE
+	close(c.messageChan)
 }
 
 func (c *Client) Close() error {
@@ -104,10 +110,6 @@ func (c *Client) InWatch() bool {
 
 func (c *Client) IsAuthenticated() bool {
 	return c.authAsUser != nil
-}
-
-func (c *Client) CloseMessageChan() {
-	close(c.messageChan)
 }
 
 type Role int
