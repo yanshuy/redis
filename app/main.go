@@ -9,7 +9,7 @@ import (
 func main() {
 	s := server.Init()
 
-	reqChan := make(chan server.Request, 100)
+	reqChan := make(chan client.Request, 100)
 	go CommandLoop(s, reqChan)
 
 	s.Run(func(c *client.Client) {
@@ -17,7 +17,7 @@ func main() {
 	})
 }
 
-func CommandLoop(s *server.Server, reqChan <-chan server.Request) {
+func CommandLoop(s *server.Server, reqChan <-chan client.Request) {
 	for req := range reqChan {
 		handler.HandleRequest(req)
 	}

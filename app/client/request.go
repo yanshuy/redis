@@ -1,20 +1,19 @@
-package server
+package client
 
 import (
 	"errors"
 	"strings"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
-	"github.com/codecrafters-io/redis-starter-go/app/client"
 )
 
 type Request struct {
-	Client *client.Client
-	Cmd    client.Command
+	Client *Client
+	Cmd    Command
 	CmdLen int
 }
 
-func ReadRequests(c *client.Client, reqChan chan<- Request) error {
+func (c *Client) ReadRequests(reqChan chan<- Request) error {
 	for {
 		if c.Blocked {
 			<-c.Unblock
@@ -31,8 +30,8 @@ func ReadRequests(c *client.Client, reqChan chan<- Request) error {
 	}
 }
 
-func ValidateCommand(req resp.Data) (client.Command, error) {
-	cmd := client.Command{}
+func ValidateCommand(req resp.Data) (Command, error) {
+	cmd := Command{}
 	switch req.Type {
 	case resp.Array:
 		if len(req.Arr) == 0 {

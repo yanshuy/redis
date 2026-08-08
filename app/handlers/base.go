@@ -220,29 +220,3 @@ func HandleInfo(c *client.Client) resp.Data {
 		return resp.Err("unsupported/unknown subcommand '" + args[0] + "'")
 	}
 }
-
-func HandleReplconf(c *client.Client) resp.Data {
-	args := c.Command.Args
-	if len(args) < 1 {
-		return resp.WrongArgs("replconf")
-	}
-	sub := strings.ToLower(args[0])
-	switch sub {
-	case "getack":
-		off := strconv.Itoa(s.ReplicationOffset)
-		res := resp.NewData(resp.Array, []string{"REPLCONF", "ACK", off})
-		c.QueueMessage(res)
-		return resp.None()
-	}
-	return resp.NewData(resp.String, "OK")
-}
-
-func HandlePsync(c *client.Client) resp.Data {
-	args := c.Command.Args
-	if len(args) != 2 {
-		return resp.WrongArgs("psync")
-	}
-
-	s.NewReplica(c)
-	return resp.None()
-}

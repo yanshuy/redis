@@ -14,7 +14,7 @@ var s *server.Server
 
 var handler = Chain(HandleCmd, Auth, SubscribeMode, Multi)
 
-func HandleRequest(req server.Request) {
+func HandleRequest(req client.Request) {
 	s = server.Global // crime
 
 	c := req.Client
@@ -158,6 +158,9 @@ func HandleCmd(c *client.Client) resp.Data {
 
 	case "psync":
 		return HandlePsync(c)
+
+	case "wait":
+		return HandleWait(c)
 
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd.Name)

@@ -95,12 +95,10 @@ func (s *Server) Run(handleConn func(c *client.Client)) {
 	}
 }
 
-func HandleClient(c *client.Client, reqChan chan<- Request) {
+func HandleClient(c *client.Client, reqChan chan<- client.Request) {
 	defer c.Close()
 
-	go c.WriteLoop()
-
-	err := ReadRequests(c, reqChan)
+	err := c.ReadRequests(reqChan)
 	if err != nil {
 		log.Println("error reading", err)
 	}

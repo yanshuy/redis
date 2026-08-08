@@ -51,6 +51,7 @@ func NewClient(conn net.Conn) *Client {
 		Reader:        NewReader(),
 	}
 	go c.ListenMessages()
+	go c.WriteLoop()
 	return c
 }
 

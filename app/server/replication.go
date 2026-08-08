@@ -34,9 +34,14 @@ func (s *Server) NewReplica(c *client.Client) error {
 
 func (s *Server) Propagate(cmd client.Command) {
 	if s.Role == client.MASTER {
-		for _, client := range s.replicas {
-			client.QueueMessage(cmd.ToRESP())
-		}
+		go func() {
+			cmd := cmd.ToRESP()
+			raw := cmd.ToResponse()
+			for _, client := range s.replicas {
+				client.Conn.Write(raw)
+			}
+			s.ReplicationOffset += len(raw)
+		}()
 	}
 }
 

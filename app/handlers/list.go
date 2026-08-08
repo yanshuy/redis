@@ -136,9 +136,8 @@ func HandleBlpop(c *client.Client) resp.Data {
 		server.Global.Store.BlockedKeys[key] = append(server.Global.Store.BlockedKeys[key], result)
 	}
 
-	c.Block()
-
 	go func() {
+		c.Block()
 		var timeout <-chan time.Time
 		if timeout_s > 0 {
 			timeout = time.After(time.Duration(timeout_s * float64(time.Second)))
@@ -150,7 +149,6 @@ func HandleBlpop(c *client.Client) resp.Data {
 		case <-timeout:
 			c.QueueMessage(resp.NewData(resp.Array))
 		}
-
 		c.UnBlock()
 	}()
 
