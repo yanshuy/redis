@@ -9,7 +9,7 @@ type Geo struct {
 	dict map[string]long_lat
 }
 
-func (g Geo) size() int {
+func (g Geo) len() int {
 	return len(g.dict)
 }
 
@@ -36,5 +36,5 @@ func (rs *RedisStore) Geoadd(key string, long float64, lat float64, member strin
 	}
 
 	rs.TouchWatchedKey(key)
-	return geo.size(), nil
+	return geo.len(), nil
 }
