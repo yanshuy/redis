@@ -71,12 +71,6 @@ func (rs *RedisStore) Type(key string) string {
 	return "none"
 }
 
-type Geo struct {
-	long float64
-	lat  float64
-	name string
-}
-
 func NewValue(t ObjType, expiryAt int64) *Value {
 	var obj any
 	switch t {
