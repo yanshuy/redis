@@ -10,15 +10,20 @@ func main() {
 	s := server.Init()
 
 	reqChan := make(chan client.Request, 100)
-	go CommandLoop(s, reqChan)
+	go CommandLoop(s, reqChan, client.BlopChan)
 
 	s.Run(func(c *client.Client) {
 		server.HandleRequests(c, reqChan)
 	})
 }
 
-func CommandLoop(s *server.Server, reqChan <-chan client.Request) {
-	for req := range reqChan {
-		handler.HandleRequest(req)
+func CommandLoop(s *server.Server, reqChan <-chan client.Request, blopChan <-chan func()) {
+	for {
+		select {
+		case req := <-reqChan:
+			handler.HandleRequest(req)
+		case t := <-blopChan:
+			t()
+		}
 	}
 }

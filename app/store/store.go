@@ -103,17 +103,11 @@ func (rs *RedisStore) Look(key string) (*Value, bool) {
 	return m, ok
 }
 
-func (rs *RedisStore) RemoveMemberAfter(ttl_ms int64, key string) {
-	timer := time.NewTimer(time.Duration(ttl_ms) * time.Millisecond)
-	<-timer.C
-	delete(rs.Store, key)
-}
-
 func (rs *RedisStore) Set(key string, val string, ttl_ms int64) {
 	var expiryAt int64
 	if ttl_ms > 0 {
 		expiryAt = time.Now().UnixMilli() + ttl_ms
-		go rs.RemoveMemberAfter(ttl_ms, key)
+		// rs.RemoveMemberAfter(ttl_ms, key) clean up routine
 	}
 	obj := NewValue(STRING, expiryAt)
 	obj.Obj = val

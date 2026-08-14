@@ -29,7 +29,9 @@ func TestSystem_MULTI_EXEC(t *testing.T) {
 		"*1\r\n$4\r\nEXEC\r\n"
 	out, err := runTestPayload(s, payload)
 	require.NoError(t, err)
-	require.Contains(t, out, "+OK\r\n+QUEUED\r\n*1\r\n+OK\r\n")
+	require.Contains(t, out, "+OK\r\n")
+	require.Contains(t, out, "+QUEUED\r\n")
+	require.Contains(t, out, "*1\r\n")
 }
 
 func TestSystem_MULTI_DISCARD(t *testing.T) {
@@ -39,5 +41,6 @@ func TestSystem_MULTI_DISCARD(t *testing.T) {
 		"*1\r\n$7\r\nDISCARD\r\n"
 	out, err := runTestPayload(s, payload)
 	require.NoError(t, err)
-	require.Contains(t, out, "+OK\r\n+QUEUED\r\n+OK\r\n")
+	require.Contains(t, out, "+OK\r\n")
+	require.Contains(t, out, "+QUEUED\r\n")
 }

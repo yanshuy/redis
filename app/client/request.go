@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
+	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 )
 
 type Request struct {
@@ -17,7 +17,7 @@ func (c *Client) ReadRequest() (Request, error) {
 	if c.Blocked {
 		<-c.Unblock
 	}
-	d, cmdLen, err := c.Reader.ReadRESP(c.Conn)
+	d, cmdLen, err := c.Reader.Read_RESP(c.Conn)
 	if err != nil {
 		return Request{}, err
 	}

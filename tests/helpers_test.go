@@ -4,15 +4,22 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/client"
 	handler "github.com/codecrafters-io/redis-starter-go/app/handlers"
 	"github.com/codecrafters-io/redis-starter-go/app/server"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
+
+type mockAddr struct{}
+
+func (m mockAddr) Network() string { return "tcp" }
+func (m mockAddr) String() string  { return "127.0.0.1:6379" }
 
 type mockRW struct {
 	mu     sync.Mutex
@@ -44,6 +51,12 @@ func (rw *mockRW) Close() error {
 	return nil
 }
 
+func (rw *mockRW) LocalAddr() net.Addr                { return mockAddr{} }
+func (rw *mockRW) RemoteAddr() net.Addr               { return mockAddr{} }
+func (rw *mockRW) SetDeadline(t time.Time) error      { return nil }
+func (rw *mockRW) SetReadDeadline(t time.Time) error  { return nil }
+func (rw *mockRW) SetWriteDeadline(t time.Time) error { return nil }
+
 func (rw *mockRW) Output() string {
 	rw.mu.Lock()
 	defer rw.mu.Unlock()
@@ -58,11 +71,13 @@ func createTestStore() *server.Server {
 		panic(err)
 	}
 	s := &server.Server{
+		Role: client.MASTER,
 		Config: server.Config{
 			Dir:        tmpDir,
 			Dbfilename: dbFile,
 		},
-		Store: st,
+		Store:    st,
+		Replicas: make(map[*client.Client]int),
 	}
 	server.Global = s
 	return s
@@ -70,8 +85,7 @@ func createTestStore() *server.Server {
 
 func runTestPayload(s *server.Server, payload string) (string, error) {
 	conn := newMockRW(payload)
-	c := client.NewClient(conn)
-	c.Server = s
+	c := client.NewClient(conn, client.CLIENT)
 
 	writeDone := make(chan struct{})
 	go func() {
@@ -79,23 +93,47 @@ func runTestPayload(s *server.Server, payload string) (string, error) {
 		close(writeDone)
 	}()
 
-	cmdChan := make(chan *client.Client, 50)
+	reqChan := make(chan client.Request, 50)
+	readErrChan := make(chan error, 1)
 
-	errChan := make(chan error, 1)
 	go func() {
-		errChan <- server.ReadRequests(c, cmdChan)
-		close(cmdChan)
+		for {
+			req, err := c.ReadRequest()
+			if err != nil {
+				readErrChan <- err
+				close(reqChan)
+				return
+			}
+			reqChan <- req
+		}
 	}()
 
-	for range cmdChan {
-		handler.HandleCommand(c)
+	var activeReqChan <-chan client.Request = reqChan
+	done := false
+
+	for !done {
+		select {
+		case req, ok := <-activeReqChan:
+			if !ok {
+				activeReqChan = nil
+			} else {
+				handler.HandleRequest(req)
+			}
+		case t := <-client.BlopChan:
+			t()
+		}
+
+		if activeReqChan == nil && !c.Blocked && len(client.BlopChan) == 0 {
+			done = true
+		}
 	}
 
-	err := <-errChan
+	time.Sleep(5 * time.Millisecond)
 
 	c.Close()
 	<-writeDone
 
+	err := <-readErrChan
 	if errors.Is(err, io.EOF) {
 		err = nil
 	}
@@ -103,4 +141,4 @@ func runTestPayload(s *server.Server, payload string) (string, error) {
 	return conn.Output(), err
 }
 
-var _ io.ReadWriteCloser = (*mockRW)(nil)
+var _ net.Conn = (*mockRW)(nil)

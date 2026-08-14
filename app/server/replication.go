@@ -8,28 +8,27 @@ import (
 	"strconv"
 	"strings"
 
-	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
+	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
 func (s *Server) NewReplica(c *client.Client) error {
 	c.MakeSlave()
-	Global.replicas = append(Global.replicas, c)
 
 	str := []string{"FULLRESYNC", Global.ReplicationId, strconv.Itoa(Global.ReplicationOffset)}
 	res := resp.NewData(resp.String, strings.Join(str, " "))
 
-	go func() {
-		c.Block()
+	_, err := c.Conn.Write(res.ToResponse())
+	if err != nil {
+		return err
+	}
+	err = store.SendRDB(c)
+	if err != nil {
+		return err
+	}
 
-		c.Conn.Write(res.ToResponse())
-		store.SendRDB(c)
-		//TODO: handle error
-
-		c.UnBlock()
-	}()
-
+	Global.Replicas[c] = 0
 	return nil
 }
 
@@ -39,52 +38,21 @@ func (s *Server) Propagate(cmd client.Command) {
 		raw := cmd.ToResponse()
 		s.ReplicationOffset += len(raw)
 		go func() {
-			for _, client := range s.replicas {
-				client.Conn.Write(raw)
+			for slave := range s.Replicas {
+				slave.Conn.Write(raw)
 			}
 		}()
 	}
 }
 
-func (s *Server) RequestAcks() chan AckMessage {
-	ch := make(chan AckMessage, s.ReplicaCount())
-
-	getack := resp.NewData(resp.Array, []string{"REPLCONF", "GETACK", "*"})
-	b := getack.ToResponse()
-
-	for _, slave := range s.replicas {
-		go func() {
-			slave.Block()
-
-			_, err := slave.Conn.Write(b)
-			if err != nil {
-				return
-			}
-
-		read:
-			resp, _, err := slave.Reader.ReadRESP(slave.Conn)
-			if err != nil {
-				return
-			}
-			cmd, err := client.ValidateCommand(resp)
-			if err != nil {
-				return
-			}
-			if cmd.Name != "replconf" || len(cmd.Args) != 2 ||
-				strings.ToLower(cmd.Args[0]) != "ack" {
-				goto read
-			}
-			off, err := strconv.Atoi(cmd.Args[1])
-			if err != nil || off < 0 {
-				return
-			}
-
-			ch <- NewAck(slave, off)
-
-			slave.UnBlock()
-		}()
+func (s *Server) CountSyncedReplicas(targetOffset int) int {
+	count := 0
+	for _, off := range s.Replicas {
+		if off >= targetOffset {
+			count++
+		}
 	}
-	return ch
+	return count
 }
 
 func (s *Server) HandshakeMaster() (*client.Client, error) {
@@ -100,19 +68,19 @@ func (s *Server) HandshakeMaster() (*client.Client, error) {
 	c := client.NewClient(conn, client.MASTER)
 
 	ping := resp.NewData(resp.Array, []string{"PING"})
-	err = c.Reader.Exchange(conn, ping, "PONG")
+	err = Exchange(c, ping, "PONG")
 	if err != nil {
 		return nil, err
 	}
 
 	listening_port := resp.NewData(resp.Array, []string{"REPLCONF", "listening-port", s.Config.port})
-	err = c.Reader.Exchange(conn, listening_port, "OK")
+	err = Exchange(c, listening_port, "OK")
 	if err != nil {
 		return nil, err
 	}
 
 	capa := resp.NewData(resp.Array, []string{"REPLCONF", "capa", "psync2"})
-	err = c.Reader.Exchange(conn, capa, "OK")
+	err = Exchange(c, capa, "OK")
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +91,7 @@ func (s *Server) HandshakeMaster() (*client.Client, error) {
 		return nil, fmt.Errorf("failed to send message to peer")
 	}
 
-	resync, _, err := c.Reader.ReadRESP(conn)
+	resync, _, err := c.Reader.Read_RESP(conn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read message from peer")
 	}
@@ -138,10 +106,25 @@ func (s *Server) HandshakeMaster() (*client.Client, error) {
 	}
 	defer file.Close()
 
-	err = c.Reader.SaveRDB(conn, io.Discard)
+	err = c.Reader.Read_RDB(conn, io.Discard)
 	if err != nil {
 		return nil, err
 	}
 
 	return c, nil
+}
+
+func Exchange(c *client.Client, out resp.Data, expected string) error {
+	_, err := c.Conn.Write(out.ToResponse())
+	if err != nil {
+		return fmt.Errorf("failed to send message to peer")
+	}
+	resp, _, err := c.Reader.Read_RESP(c.Conn)
+	if err != nil {
+		return fmt.Errorf("failed to read message from peer")
+	}
+	if !strings.EqualFold(resp.Str, expected) {
+		return fmt.Errorf("unexpected response from peer")
+	}
+	return nil
 }

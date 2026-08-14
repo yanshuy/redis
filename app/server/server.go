@@ -30,26 +30,14 @@ type Server struct {
 	ReplicationId     string
 	ReplicationOffset int
 
-	Config       Config
-	Store        *store.RedisStore
-	replicas     []*client.Client
-	AckListeners map[*client.Client]chan AckMessage
-}
-
-type AckMessage struct {
-	Slave  *client.Client
-	Offset int
-}
-
-func NewAck(c *client.Client, off int) AckMessage {
-	return AckMessage{
-		Slave:  c,
-		Offset: off,
-	}
+	Config    Config
+	Store     *store.RedisStore
+	Replicas  map[*client.Client]int
+	BlClients []*client.Client
 }
 
 func (s *Server) ReplicaCount() int {
-	return len(s.replicas)
+	return len(s.Replicas)
 }
 
 var Global *Server
@@ -62,6 +50,7 @@ func NewServer(role client.Role, config Config, store *store.RedisStore) *Server
 		replicaof:         *replicaofFlag,
 		ReplicationId:     generateRandID(),
 		ReplicationOffset: 0,
+		Replicas:          make(map[*client.Client]int),
 	}
 	return s
 }
@@ -86,7 +75,6 @@ func Init() *Server {
 		Global = NewServer(MASTER, config, store)
 	} else {
 		Global = NewServer(SLAVE, config, store)
-
 	}
 	return Global
 }

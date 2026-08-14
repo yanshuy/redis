@@ -1,12 +1,10 @@
 package handler
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
-	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
+	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
 )
 
@@ -15,18 +13,36 @@ func HandleReplconf(c *client.Client) resp.Data {
 	if len(args) < 1 {
 		return resp.WrongArgs("replconf")
 	}
+
 	sub := strings.ToLower(args[0])
-	switch sub {
-	case "getack":
-		if s.Role == client.SLAVE {
-			fmt.Println("got getack as a slave sendin", c.Role)
+	switch s.Role {
+	case client.SLAVE:
+		switch sub {
+		case "getack":
 			res := resp.NewData(resp.Array, []string{"REPLCONF", "ACK", strconv.Itoa(s.ReplicationOffset)})
 			c.QueueMessage(res) // because returned response are not sent if client is master
+			return resp.None()
 		}
-		return resp.None()
-
-	case "ack":
-		return resp.None()
+	case client.MASTER:
+		switch sub {
+		case "ack":
+			if len(args) != 2 {
+				return resp.WrongArgs("replconf|ack")
+			}
+			off, err := strconv.Atoi(args[1])
+			if err != nil || off < 0 {
+				return resp.Err("value is not an integer or out of range")
+			}
+			s.Replicas[c] = off
+			for _, blClient := range s.BlClients {
+				if s.CountSyncedReplicas(blClient.Blop.Reploffset) >= blClient.Blop.Numreplicas {
+					if blClient.Blop.Cancel != nil {
+						blClient.Blop.Cancel()
+					}
+				}
+			}
+			return resp.None()
+		}
 	}
 
 	return resp.NewData(resp.String, "OK")
@@ -52,41 +68,33 @@ func HandleWait(c *client.Client) resp.Data {
 	if err != nil || numreplicas < 0 {
 		return resp.Err("numreplicas is not an integer or out of range")
 	}
-	if numreplicas == 0 {
-		return resp.NewData(resp.Integer, 0)
-	}
+
 	timeout_s, err := strconv.ParseFloat(args[1], 64)
 	if err != nil || timeout_s < 0 {
 		return resp.Err("timeout is not an integer or out of range")
 	}
 
-	if s.ReplicationOffset == 0 {
-		return resp.NewData(resp.Integer, s.ReplicaCount())
+	targetOffset := s.ReplicationOffset
+	synced := s.CountSyncedReplicas(targetOffset)
+
+	if synced >= numreplicas || targetOffset == 0 {
+		return resp.NewData(resp.Integer, synced)
 	}
 
-	targetOffset := s.ReplicationOffset
+	c.Blop.Reploffset = targetOffset
+	c.Blop.Numreplicas = numreplicas
+	s.BlClients = append(s.BlClients, c)
 
-	go func() {
-		var timeout <-chan time.Time
-		if timeout_s > 0 {
-			timeout = time.After(time.Duration(timeout_s * float64(time.Millisecond)))
-		}
+	f := func() {
+		s.BlClients = filter(s.BlClients, c)
+		c.QueueMessage(resp.NewData(resp.Integer, s.CountSyncedReplicas(targetOffset)))
+	}
+	c.Wait(timeout_s, f, f)
 
-		ackChan := s.RequestAcks()
-		acksRev := 0
-	outer:
-		for acksRev < numreplicas {
-			select {
-			case ack := <-ackChan:
-				if ack.Offset >= targetOffset {
-					acksRev++
-				}
-			case <-timeout:
-				break outer
-			}
-		}
-		c.QueueMessage(resp.NewData(resp.Integer, acksRev))
-	}()
+	getack := resp.NewData(resp.Array, []string{"REPLCONF", "GETACK", "*"})
+	for slave := range s.Replicas {
+		slave.QueueMessage(getack)
+	}
 
 	return resp.None()
 }

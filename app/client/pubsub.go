@@ -3,7 +3,7 @@ package client
 import (
 	"sync"
 
-	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
+	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 )
 
 type Channels struct {

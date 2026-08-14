@@ -1,10 +1,12 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"net"
+	"time"
 
-	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
+	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 )
 
 type Command struct {
@@ -27,6 +29,12 @@ type Client struct {
 	CASDirty   bool
 
 	WatchingKeys Set[string]
+
+	Blop struct {
+		Cancel      context.CancelFunc
+		Reploffset  int
+		Numreplicas int
+	}
 
 	Blocked  bool
 	Unblock  chan struct{}
@@ -55,6 +63,8 @@ func NewClient(conn net.Conn, role Role) *Client {
 	go c.WriteLoop()
 	return c
 }
+
+var BlopChan = make(chan func())
 
 func (c *Client) MakeSlave() {
 	c.Role = SLAVE
@@ -94,6 +104,34 @@ func (c *Client) Block() {
 func (c *Client) UnBlock() {
 	c.Blocked = false
 	close(c.Unblock)
+}
+
+func (c *Client) Wait(timeout_s float64, onTimeout func(), onSuccess func()) {
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if timeout_s > 0 {
+		duration := time.Duration(timeout_s * float64(time.Millisecond))
+		ctx, cancel = context.WithTimeout(context.Background(), duration)
+	} else {
+		ctx, cancel = context.WithCancel(context.Background())
+	}
+	c.Blop.Cancel = cancel
+
+	c.Block()
+	go func() {
+		defer c.UnBlock()
+
+		<-ctx.Done()
+
+		if ctx.Err() == context.Canceled {
+			BlopChan <- onSuccess
+		}
+
+		if ctx.Err() == context.DeadlineExceeded {
+			BlopChan <- onTimeout
+			cancel()
+		}
+	}()
 }
 
 func (c *Client) InSubscribeMode() bool {

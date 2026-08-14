@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
+	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )

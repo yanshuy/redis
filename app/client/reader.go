@@ -2,12 +2,9 @@ package client
 
 import (
 	"errors"
-	"fmt"
 	"io"
-	"net"
-	"strings"
 
-	resp "github.com/codecrafters-io/redis-starter-go/app/RESP"
+	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 )
 
 type Reader struct {
@@ -22,7 +19,7 @@ func NewReader() *Reader {
 	}
 }
 
-func (r *Reader) ReadRESP(conn io.Reader) (resp.Data, int, error) {
+func (r *Reader) Read_RESP(conn io.Reader) (resp.Data, int, error) {
 	b := r.buf
 
 	for {
@@ -50,22 +47,7 @@ func (r *Reader) ReadRESP(conn io.Reader) (resp.Data, int, error) {
 	}
 }
 
-func (r *Reader) Exchange(conn net.Conn, out resp.Data, expected string) error {
-	_, err := conn.Write(out.ToResponse())
-	if err != nil {
-		return fmt.Errorf("failed to send message to peer")
-	}
-	resp, _, err := r.ReadRESP(conn)
-	if err != nil {
-		return fmt.Errorf("failed to read message from peer")
-	}
-	if !strings.EqualFold(resp.Str, expected) {
-		return fmt.Errorf("unexpected response from peer")
-	}
-	return nil
-}
-
-func (r *Reader) SaveRDB(conn io.Reader, file io.Writer) error {
+func (r *Reader) Read_RDB(conn io.Reader, file io.Writer) error {
 	var (
 		rdbLen int
 		used   int
