@@ -83,7 +83,7 @@ func NewValue(t ObjType, expiryAt int64) *Value {
 	case ZSET:
 		obj = NewZset()
 	case GEO:
-		obj = Geo{}
+		obj = NewGeo()
 	default:
 		panic(fmt.Sprintf("unexpected store.ObjType: %#v", t))
 	}
