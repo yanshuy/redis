@@ -2,6 +2,8 @@ package store
 
 import (
 	"slices"
+
+	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 )
 
 func (rs *RedisStore) NotifyBlockedClient(key string, values []string) []string {
@@ -11,21 +13,21 @@ func (rs *RedisStore) NotifyBlockedClient(key string, values []string) []string 
 	}
 
 	remainingValues := values
-	var remainingBlocked []chan BlockResult
 
-	for i, ch := range blocked {
+	for i, c := range blocked {
 		if len(remainingValues) == 0 {
-			remainingBlocked = append(remainingBlocked, blocked[i:]...)
-			break
+			rs.BlockedKeys[key] = blocked[i:]
+			return remainingValues
 		}
-		select {
-		case ch <- BlockResult{Key: key, Value: remainingValues[0]}:
-			remainingValues = remainingValues[1:]
-		default:
+		val := remainingValues[0]
+		c.QueueMessage(resp.NewData(resp.Array, []string{key, val}))
+		if c.Blop.Cancel != nil {
+			c.Blop.Cancel()
 		}
+		remainingValues = remainingValues[1:]
 	}
 
-	rs.BlockedKeys[key] = remainingBlocked
+	delete(rs.BlockedKeys, key)
 	return remainingValues
 }
 

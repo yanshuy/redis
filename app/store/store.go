@@ -10,22 +10,17 @@ import (
 
 type RedisStore struct {
 	Store       map[string]*Value
-	BlockedKeys map[string][]chan BlockResult
+	BlockedKeys map[string][]*client.Client
 	WatchedKeys map[string][]*client.Client
 
 	dir        string
 	dbfilename string
 }
 
-type BlockResult struct {
-	Key   string
-	Value string
-}
-
 func InitializeStore(dir string, dbfilename string) (*RedisStore, error) {
 	store := &RedisStore{
 		Store:       make(map[string]*Value),
-		BlockedKeys: make(map[string][]chan BlockResult),
+		BlockedKeys: make(map[string][]*client.Client),
 		WatchedKeys: make(map[string][]*client.Client),
 		dir:         dir,
 		dbfilename:  dbfilename,

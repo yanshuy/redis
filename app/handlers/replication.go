@@ -3,6 +3,7 @@ package handler
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
@@ -89,7 +90,8 @@ func HandleWait(c *client.Client) resp.Data {
 		s.BlClients = filter(s.BlClients, c)
 		c.QueueMessage(resp.NewData(resp.Integer, s.CountSyncedReplicas(targetOffset)))
 	}
-	c.Wait(timeout_s, f, f)
+	duration := time.Duration(timeout_s * float64(time.Millisecond))
+	c.Wait(duration, f, f)
 
 	getack := resp.NewData(resp.Array, []string{"REPLCONF", "GETACK", "*"})
 	for slave := range s.Replicas {

@@ -6,7 +6,6 @@ import (
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
-	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
 func HandleRpush(c *client.Client) resp.Data {
@@ -130,26 +129,14 @@ func HandleBlpop(c *client.Client) resp.Data {
 		}
 	}
 
-	result := make(chan store.BlockResult, 1)
 	for _, key := range keys {
-		s.Store.BlockedKeys[key] = append(s.Store.BlockedKeys[key], result)
+		s.Store.BlockedKeys[key] = append(s.Store.BlockedKeys[key], c)
 	}
 
-	c.Block()
-	go func() {
-		var timeout <-chan time.Time
-		if timeout_s > 0 {
-			timeout = time.After(time.Duration(timeout_s * float64(time.Second)))
-		}
-
-		select {
-		case msg := <-result:
-			c.QueueMessage(resp.NewData(resp.Array, []string{msg.Key, msg.Value}))
-		case <-timeout:
-			c.QueueMessage(resp.NewData(resp.Array))
-		}
-		c.UnBlock()
-	}()
+	duration := time.Duration(timeout_s * float64(time.Second))
+	c.Wait(duration, func() {
+		c.QueueMessage(resp.NewData(resp.Array))
+	}, func() {})
 
 	return resp.None()
 }

@@ -106,12 +106,11 @@ func (c *Client) UnBlock() {
 	close(c.Unblock)
 }
 
-func (c *Client) Wait(timeout_s float64, onTimeout func(), onSuccess func()) {
+func (c *Client) Wait(timeout time.Duration, onTimeout func(), onSuccess func()) {
 	var ctx context.Context
 	var cancel context.CancelFunc
-	if timeout_s > 0 {
-		duration := time.Duration(timeout_s * float64(time.Millisecond))
-		ctx, cancel = context.WithTimeout(context.Background(), duration)
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
 	} else {
 		ctx, cancel = context.WithCancel(context.Background())
 	}
