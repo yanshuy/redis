@@ -44,6 +44,7 @@ const (
 	LIST
 	STREAM
 	ZSET
+	GEO
 )
 
 type Value struct {
@@ -63,9 +64,17 @@ func (rs *RedisStore) Type(key string) string {
 			return "stream"
 		case ZSET:
 			return "zset"
+		case GEO:
+			return "geo"
 		}
 	}
 	return "none"
+}
+
+type Geo struct {
+	long float64
+	lat  float64
+	name string
 }
 
 func NewValue(t ObjType, expiryAt int64) *Value {
@@ -79,6 +88,8 @@ func NewValue(t ObjType, expiryAt int64) *Value {
 		obj = Stream{}
 	case ZSET:
 		obj = NewZset()
+	case GEO:
+		obj = Geo{}
 	default:
 		panic(fmt.Sprintf("unexpected store.ObjType: %#v", t))
 	}
@@ -87,7 +98,7 @@ func NewValue(t ObjType, expiryAt int64) *Value {
 
 type List = []string
 type RedisValue interface {
-	~string | List | Stream | Zset
+	~string | List | Stream | Zset | Geo
 }
 
 func As[T RedisValue](val *Value) (T, error) {

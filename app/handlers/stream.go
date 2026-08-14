@@ -5,7 +5,6 @@ import (
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
-	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
 
 func HandleXadd(c *client.Client) resp.Data {
@@ -17,7 +16,7 @@ func HandleXadd(c *client.Client) resp.Data {
 	stream_key := args[1]
 	key_vals := args[2:]
 
-	s, err := server.Global.Store.Xadd(key, stream_key, key_vals)
+	s, err := s.Store.Xadd(key, stream_key, key_vals)
 	if err != nil {
 		return resp.Err(err.Error())
 	}
@@ -37,7 +36,7 @@ func HandleXrange(c *client.Client) resp.Data {
 	startStr := args[1]
 	endStr := args[2]
 
-	entries, err := server.Global.Store.XRange(key, startStr, endStr)
+	entries, err := s.Store.XRange(key, startStr, endStr)
 	if err != nil {
 		return resp.Err(err.Error())
 	}

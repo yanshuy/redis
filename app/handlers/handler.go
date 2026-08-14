@@ -162,6 +162,9 @@ func HandleCmd(c *client.Client) resp.Data {
 	case "wait":
 		return HandleWait(c)
 
+	case "geoadd":
+		return HandleGeoAdd(c)
+
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd.Name)
 		return resp.Err(msg)

@@ -5,7 +5,6 @@ import (
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
-	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
 
 func HandleZadd(c *client.Client) resp.Data {
@@ -30,7 +29,7 @@ func HandleZadd(c *client.Client) resp.Data {
 		members = append(members, args[i+1])
 	}
 
-	added, err := server.Global.Store.Zadd(key, scores, members)
+	added, err := s.Store.Zadd(key, scores, members)
 	if err != nil {
 		return resp.Err(err.Error())
 	}
@@ -43,7 +42,7 @@ func HandleZrank(c *client.Client) resp.Data {
 		return resp.WrongArgs("zrank")
 	}
 
-	rank, found, err := server.Global.Store.Zrank(args[0], args[1])
+	rank, found, err := s.Store.Zrank(args[0], args[1])
 	if err != nil {
 		return resp.Err(err.Error())
 	}
@@ -68,7 +67,7 @@ func HandleZrange(c *client.Client) resp.Data {
 		return resp.Err("value is not an integer or out of range")
 	}
 
-	list, err := server.Global.Store.Zrange(args[0], start, end)
+	list, err := s.Store.Zrange(args[0], start, end)
 	if err != nil {
 		return resp.Err(err.Error())
 	}
@@ -81,7 +80,7 @@ func HandleZcard(c *client.Client) resp.Data {
 		return resp.WrongArgs("zcard")
 	}
 
-	card, err := server.Global.Store.Zcard(args[0])
+	card, err := s.Store.Zcard(args[0])
 	if err != nil {
 		return resp.Err(err.Error())
 	}
@@ -94,7 +93,7 @@ func HandleZscore(c *client.Client) resp.Data {
 		return resp.WrongArgs("zscore")
 	}
 
-	score, found, err := server.Global.Store.Zscore(args[0], args[1])
+	score, found, err := s.Store.Zscore(args[0], args[1])
 	if err != nil {
 		return resp.Err(err.Error())
 	}
@@ -110,7 +109,7 @@ func HandleZrem(c *client.Client) resp.Data {
 		return resp.WrongArgs("zrem")
 	}
 
-	removed, err := server.Global.Store.Zrem(args[0], args[1])
+	removed, err := s.Store.Zrem(args[0], args[1])
 	if err != nil {
 		return resp.Err(err.Error())
 	}
