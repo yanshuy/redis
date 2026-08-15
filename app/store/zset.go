@@ -327,7 +327,7 @@ func (rs *RedisStore) GeoPos(key string, members []string) ([]*Coordinates, erro
 		return nil, err
 	}
 
-	answers := make([]*Coordinates, len(members))
+	answers := make([]*Coordinates, 0, len(members))
 
 	for _, member := range members {
 		z, ok := zset.dict[member]
