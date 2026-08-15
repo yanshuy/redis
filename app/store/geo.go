@@ -181,3 +181,29 @@ func (rs *RedisStore) Geodist(key string, place1 string, place2 string) (float64
 
 	return haversineDist(c1, c2), nil
 }
+
+func (rs *RedisStore) Geosearch(key string, long float64, lat float64, radius float64) ([]string, error) {
+	val, ok := rs.Look(key)
+	if !ok {
+		return nil, fmt.Errorf("Operation against a key holding the wrong kind of value")
+	}
+
+	zset, err := As[Zset](val)
+	if err != nil {
+		return nil, err
+	}
+
+	answers := make([]string, 0)
+	cord1 := Coordinates{
+		Longitude: long,
+		Latitude:  lat,
+	}
+	for _, z := range zset.dict {
+		cord2 := decode(uint64(z.score))
+		distance := haversineDist(cord1, cord2)
+		if distance <= radius {
+			answers = append(answers, z.member)
+		}
+	}
+	return answers, nil
+}

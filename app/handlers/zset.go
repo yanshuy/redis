@@ -1,11 +1,17 @@
 package handler
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
 )
+
+func Ftoa(number float64) string {
+	return strconv.FormatFloat(number, 'g', -1, 64)
+}
 
 func HandleZadd(c *client.Client) resp.Data {
 	args := c.Command.Args
@@ -181,6 +187,49 @@ func HandleGeodist(c *client.Client) resp.Data {
 	return resp.NewData(resp.BulkString, Ftoa(distance))
 }
 
-func Ftoa(number float64) string {
-	return strconv.FormatFloat(number, 'g', -1, 64)
+func standardiseToMeters(radius float64, unit string) (float64, error) {
+	switch strings.ToLower(unit) {
+	case "m":
+		return radius, nil
+	case "km":
+		return radius * 1000.0, nil
+	case "mi":
+		return radius * 1609.34, nil
+	case "ft":
+		return radius * 0.3048, nil
+	default:
+		return 0, fmt.Errorf("unsupported unit '%s', expected m, km, mi, or ft", unit)
+	}
+}
+
+func HandleGeosearch(c *client.Client) resp.Data {
+	args := c.Command.Args
+	if len(args) != 7 ||
+		strings.ToUpper(args[1]) != "FROMLONLAT" || strings.ToUpper(args[4]) != "BYRADIUS" {
+		return resp.WrongArgs("geosearch only FROMLONLAT mode with BYRADIUS is supported")
+	}
+	key := args[0]
+	longitude, err := strconv.ParseFloat(args[2], 64)
+	if err != nil {
+		return resp.Err("longitude is not an integer or out of range")
+	}
+	latitude, err := strconv.ParseFloat(args[3], 64)
+	if err != nil {
+		return resp.Err("latitude is not an integer or out of range")
+	}
+	radius, err := strconv.ParseFloat(args[5], 64)
+	if err != nil {
+		return resp.Err("latitude is not an integer or out of range")
+	}
+	unit := args[6]
+	radius, err = standardiseToMeters(radius, unit)
+	if err != nil {
+		return resp.Err(err.Error())
+	}
+
+	answers, err := s.Store.Geosearch(key, longitude, latitude, radius)
+	if err != nil {
+		return resp.Err(err.Error())
+	}
+	return resp.NewData(resp.Array, answers)
 }
