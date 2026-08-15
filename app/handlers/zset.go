@@ -158,8 +158,12 @@ func HandleGeoPos(c *client.Client) resp.Data {
 		if cord == nil {
 			response = append(response, resp.NewData(resp.Array))
 		} else {
-			response = append(response, resp.NewData(resp.Array, cord.Longitude, cord.Latitude))
+			response = append(response, resp.NewData(resp.Array, Ftoa(cord.Longitude), Ftoa(cord.Latitude)))
 		}
 	}
 	return resp.NewData(resp.Array, response)
+}
+
+func Ftoa(number float64) string {
+	return strconv.FormatFloat(number, 'g', -1, 64)
 }
