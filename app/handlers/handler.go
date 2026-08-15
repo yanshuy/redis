@@ -169,7 +169,7 @@ func HandleCmd(c *client.Client) resp.Data {
 		return HandleGeoPos(c)
 
 	case "geodist":
-		return HandleGeoPos(c)
+		return HandleGeodist(c)
 
 	default:
 		msg := fmt.Sprintf("unknown command `%s`", cmd.Name)
