@@ -171,7 +171,7 @@ func (rs *RedisStore) Geodist(key string, place1 string, place2 string) (float64
 	}
 
 	z1, ok1 := zset.dict[place1]
-	z2, ok2 := zset.dict[place1]
+	z2, ok2 := zset.dict[place2]
 	if !ok1 || !ok2 {
 		return -1, fmt.Errorf("Operation against a key holding the wrong kind of value")
 	}
