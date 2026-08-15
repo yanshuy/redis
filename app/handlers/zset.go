@@ -42,11 +42,11 @@ func HandleZrank(c *client.Client) resp.Data {
 		return resp.WrongArgs("zrank")
 	}
 
-	rank, found, err := s.Store.Zrank(args[0], args[1])
+	rank, err := s.Store.Zrank(args[0], args[1])
 	if err != nil {
 		return resp.Err(err.Error())
 	}
-	if !found {
+	if rank == -1 {
 		return resp.NewData(resp.NullBulkString)
 	}
 	return resp.NewData(resp.Integer, rank)

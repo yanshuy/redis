@@ -1,5 +1,7 @@
 package store
 
+import "fmt"
+
 type Z struct {
 	member string
 	score  float64
@@ -91,30 +93,29 @@ func (rs *RedisStore) Zadd(key string, scores []float64, member []string) (int, 
 	return inserts, nil
 }
 
-func (rs *RedisStore) Zrank(key, member string) (int, bool, error) {
+func (rs *RedisStore) Zrank(key, member string) (int, error) {
 	val, ok := rs.Look(key)
 	if !ok {
-		return 0, false, nil
+		return -1, nil
 	}
 	z, err := As[Zset](val)
 	if err != nil {
-		return 0, false, err
+		return -1, err
 	}
 	if _, ok := z.dict[member]; !ok {
-		return 0, false, nil
+		return -1, nil
 	}
 
 	rank := 0
 	cur := z.list.head.next
 	for cur != nil {
 		if cur.member == member {
-			return rank, true, nil
+			return rank, nil
 		}
 		rank++
 		cur = cur.next
 	}
-
-	return 0, false, nil
+	return -1, nil
 }
 
 func (rs *RedisStore) Zrange(key string, start int, end int) ([]string, error) {
@@ -207,4 +208,39 @@ func (rs *RedisStore) Zrem(key, member string) (int, error) {
 
 	rs.TouchWatchedKey(key)
 	return 1, nil
+}
+
+type long_lat struct {
+	long float64
+	lat  float64
+}
+
+func inRange(long float64, lat float64) bool {
+	return (long >= -180 && long <= 180) && (lat >= -85.05112878 && lat <= 85.05112878)
+}
+
+func (rs *RedisStore) Geoadd(key string, long float64, lat float64, member string) (int, error) {
+	val, ok := rs.Look(key)
+	if !ok {
+		val = NewValue(ZSET, 0)
+		rs.Store[key] = val
+	}
+	zset, err := As[Zset](val)
+	if err != nil {
+		return 0, err
+	}
+
+	if !inRange(long, lat) {
+		return 0, fmt.Errorf("invalid longitude,latitude pair %f, %f", long, lat)
+	}
+
+	score := 0.0
+
+	inserts := 0
+	if zset.insert(Z{member: member, score: score}) {
+		inserts++
+	}
+
+	rs.TouchWatchedKey(key)
+	return inserts, nil
 }
