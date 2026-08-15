@@ -1,5 +1,9 @@
 package store
 
+import (
+	"fmt"
+)
+
 type long_lat struct {
 	long float64
 	lat  float64
@@ -28,6 +32,10 @@ func (rs *RedisStore) Geoadd(key string, long float64, lat float64, member strin
 	geo, err := As[Geo](val)
 	if err != nil {
 		return 0, err
+	}
+
+	if (long >= -180 && long <= 180) && (lat >= -85.05112878 && lat <= 85.05112878) {
+		return 0, fmt.Errorf("invalid longitude,latitude pair %f, %f", long, lat)
 	}
 
 	geo.dict[member] = long_lat{
