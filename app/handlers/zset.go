@@ -148,7 +148,7 @@ func HandleGeoPos(c *client.Client) resp.Data {
 	}
 	key := args[0]
 
-	cords, err := s.Store.GeoPos(key, args[1:])
+	cords, err := s.Store.Geopos(key, args[1:])
 	if err != nil {
 		return resp.Err(err.Error())
 	}
@@ -162,6 +162,23 @@ func HandleGeoPos(c *client.Client) resp.Data {
 		}
 	}
 	return resp.NewData(resp.Array, response)
+}
+
+func HandleGeodist(c *client.Client) resp.Data {
+	args := c.Command.Args
+	if len(args) != 3 {
+		return resp.WrongArgs("geodist")
+	}
+	key := args[0]
+
+	distance, err := s.Store.Geodist(key, args[1], args[2])
+	if err != nil {
+		return resp.Err(err.Error())
+	}
+	if distance == -1 {
+		return resp.NewData(resp.BulkString, Ftoa(distance))
+	}
+	return resp.NewData(resp.NullBulkString)
 }
 
 func Ftoa(number float64) string {
