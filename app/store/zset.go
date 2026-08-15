@@ -236,11 +236,11 @@ func spreadInt32ToInt64(v uint32) uint64 {
 func interleave(x, y uint32) uint64 {
 	xSpread := spreadInt32ToInt64(x)
 	ySpread := spreadInt32ToInt64(y)
-	yShifted := ySpread << 1
-	return xSpread | yShifted
+
+	return xSpread | (ySpread << 1)
 }
 
-func encode(latitude, longitude float64) uint64 {
+func encode(longitude, latitude float64) uint64 {
 	normalizedLatitude := math.Pow(2, 26) * (latitude - MIN_LATITUDE) / LATITUDE_RANGE
 	normalizedLongitude := math.Pow(2, 26) * (longitude - MIN_LONGITUDE) / LONGITUDE_RANGE
 
@@ -251,7 +251,7 @@ func encode(latitude, longitude float64) uint64 {
 }
 
 func compactInt64ToInt32(v uint64) uint32 {
-	result := v & 0x5555555555555555
+	result := v
 	result = (result | (result >> 1)) & 0x3333333333333333
 	result = (result | (result >> 2)) & 0x0F0F0F0F0F0F0F0F
 	result = (result | (result >> 4)) & 0x00FF00FF00FF00FF
@@ -273,8 +273,8 @@ func convertGridNumbersToCoordinates(gridLatitudeNumber, gridLongitudeNumber uin
 }
 
 func decode(geoCode uint64) Coordinates {
-	y := geoCode >> 1
-	x := geoCode
+	x := geoCode & 0x5555555555555555
+	y := (geoCode >> 1) & 0x5555555555555555
 
 	gridLatitudeNumber := compactInt64ToInt32(x)
 	gridLongitudeNumber := compactInt64ToInt32(y)
