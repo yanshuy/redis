@@ -176,9 +176,9 @@ func HandleGeodist(c *client.Client) resp.Data {
 		return resp.Err(err.Error())
 	}
 	if distance == -1 {
-		return resp.NewData(resp.BulkString, Ftoa(distance))
+		return resp.NewData(resp.NullBulkString)
 	}
-	return resp.NewData(resp.NullBulkString)
+	return resp.NewData(resp.BulkString, Ftoa(distance))
 }
 
 func Ftoa(number float64) string {
