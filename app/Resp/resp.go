@@ -61,6 +61,15 @@ func NewData(t byte, data ...any) Data {
 				d.Arr = append(d.Arr, v)
 			case []Data:
 				d.Arr = v
+			case int64:
+				s := NewData(Integer, v)
+				d.Arr = append(d.Arr, s)
+			case int:
+				s := NewData(Integer, int64(v))
+				d.Arr = append(d.Arr, s)
+			case float64:
+				s := NewData(Integer, int64(v))
+				d.Arr = append(d.Arr, s)
 			case string:
 				s := NewData(BulkString, v)
 				d.Arr = append(d.Arr, s)
@@ -74,12 +83,6 @@ func NewData(t byte, data ...any) Data {
 					s := NewData(BulkString, elem)
 					d.Arr = append(d.Arr, s)
 				}
-			case int64:
-				s := NewData(Integer, v)
-				d.Arr = append(d.Arr, s)
-			case int:
-				s := NewData(Integer, int64(v))
-				d.Arr = append(d.Arr, s)
 			default:
 				panic("unhandled case")
 			}
