@@ -6,6 +6,7 @@ import (
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
+	"github.com/codecrafters-io/redis-starter-go/app/server"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
@@ -54,7 +55,7 @@ func HandleSet(c *client.Client) resp.Data {
 	return resp.NewData(resp.String, "OK")
 }
 
-func HandleCmdIncr(c *client.Client) resp.Data {
+func HandleIncr(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) != 1 {
 		return resp.WrongArgs("incr")
@@ -159,6 +160,68 @@ func HandleKeys(c *client.Client) resp.Data {
 	return resp.NewData(resp.Array, keys)
 }
 
+func HandleExec(c *client.Client) resp.Data {
+	if !c.InMulti {
+		return resp.Err("EXEC without MULTI")
+	}
+	c.InMulti = false
+
+	dirty := c.CASDirty
+
+	queued := c.QueuedCmds
+	c.QueuedCmds = nil
+
+	HandleUnWatch(c)
+
+	if dirty {
+		return resp.NewData(resp.Array)
+	}
+
+	results := make([]resp.Data, len(queued))
+	for i, cmd := range queued {
+		c.Command = cmd
+		res := Chain(HandleCmd, Auth, SubscribeMode)(c)
+		results[i] = res
+	}
+	return resp.NewData(resp.Array, results)
+}
+
+func HandleDiscard(c *client.Client) resp.Data {
+	if c.InMulti {
+		c.InMulti = false
+	} else {
+		return resp.Err("DISCARD without MULTI")
+	}
+	c.QueuedCmds = nil
+	c.CASDirty = false
+	return resp.NewData(resp.String, "OK")
+}
+
+func HandleWatch(c *client.Client) resp.Data {
+	args := c.Command.Args
+	for _, key := range args {
+		c.WatchingKeys.Add(key)
+		server.Global.Store.WatchedKeys[key] = append(server.Global.Store.WatchedKeys[key], c)
+	}
+	return resp.NewData(resp.String, "OK")
+}
+
+func HandleUnWatch(c *client.Client) resp.Data {
+	for key := range c.WatchingKeys {
+		clients := server.Global.Store.WatchedKeys[key]
+		clients = filter(clients, c)
+
+		if len(clients) == 0 {
+			delete(server.Global.Store.WatchedKeys, key)
+		} else {
+			server.Global.Store.WatchedKeys[key] = clients
+		}
+	}
+	clear(c.WatchingKeys)
+	c.CASDirty = false
+	return resp.NewData(resp.String, "OK")
+}
+
 func HandleAuth(c *client.Client) resp.Data {
 	args := c.Command.Args
 	if len(args) != 2 {
@@ -219,4 +282,13 @@ func HandleInfo(c *client.Client) resp.Data {
 	default:
 		return resp.Err("unsupported/unknown subcommand '" + args[0] + "'")
 	}
+}
+
+func filter[T comparable](array []T, elem T) []T {
+	for i, item := range array {
+		if elem == item {
+			return append(array[:i], array[i+1:]...)
+		}
+	}
+	return array
 }

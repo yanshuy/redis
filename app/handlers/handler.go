@@ -132,7 +132,7 @@ func HandleCmd(c *client.Client) resp.Data {
 		return resp.NewData(resp.String, "OK")
 
 	case "incr":
-		return HandleCmdIncr(c)
+		return HandleIncr(c)
 
 	case "multi":
 		c.InMulti = true
