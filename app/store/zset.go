@@ -307,7 +307,6 @@ func (rs *RedisStore) Geoadd(key string, long float64, lat float64, member strin
 	}
 
 	score := encode(long, lat)
-	fmt.Println(score, float64(score))
 	inserts := 0
 	if zset.insert(Z{member: member, score: float64(score)}) {
 		inserts++
@@ -320,8 +319,9 @@ func (rs *RedisStore) Geoadd(key string, long float64, lat float64, member strin
 func (rs *RedisStore) GeoPos(key string, members []string) ([]*Coordinates, error) {
 	val, ok := rs.Look(key)
 	if !ok {
-		return nil, nil
+		return make([]*Coordinates, len(members)), nil
 	}
+
 	zset, err := As[Zset](val)
 	if err != nil {
 		return nil, err
