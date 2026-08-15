@@ -23,6 +23,10 @@ func NewGeo() Geo {
 	}
 }
 
+func inRange(long float64, lat float64) bool {
+	return (long >= -180 && long <= 180) && (lat >= -85.05112878 && lat <= 85.05112878)
+}
+
 func (rs *RedisStore) Geoadd(key string, long float64, lat float64, member string) (int, error) {
 	val, ok := rs.Look(key)
 	if !ok {
@@ -34,7 +38,7 @@ func (rs *RedisStore) Geoadd(key string, long float64, lat float64, member strin
 		return 0, err
 	}
 
-	if (long >= -180 && long <= 180) && (lat >= -85.05112878 && lat <= 85.05112878) {
+	if !inRange(long, lat) {
 		return 0, fmt.Errorf("invalid longitude,latitude pair %f, %f", long, lat)
 	}
 
