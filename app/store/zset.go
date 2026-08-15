@@ -316,3 +316,24 @@ func (rs *RedisStore) Geoadd(key string, long float64, lat float64, member strin
 	rs.TouchWatchedKey(key)
 	return inserts, nil
 }
+
+func (rs *RedisStore) GeoPos(key string, member string) (*Coordinates, error) {
+	val, ok := rs.Look(key)
+	if !ok {
+		return nil, nil
+	}
+	zset, err := As[Zset](val)
+	if err != nil {
+		return nil, err
+	}
+
+	z, ok := zset.dict[member]
+	if !ok {
+		return nil, nil
+	}
+	geoCode := uint64(z.score)
+
+	cords := decode(geoCode)
+
+	return &cords, nil
+}

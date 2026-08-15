@@ -115,3 +115,47 @@ func HandleZrem(c *client.Client) resp.Data {
 	}
 	return resp.NewData(resp.Integer, removed)
 }
+
+func HandleGeoAdd(c *client.Client) resp.Data {
+	args := c.Command.Args
+	if len(args) != 4 {
+		return resp.WrongArgs("geoadd")
+	}
+	key := args[0]
+
+	longitude, err := strconv.ParseFloat(args[1], 64)
+	if err != nil {
+		return resp.Err("longitude is not an integer or out of range")
+	}
+	latitude, err := strconv.ParseFloat(args[2], 64)
+	if err != nil {
+		return resp.Err("latitude is not an integer or out of range")
+	}
+
+	member := args[3]
+
+	n, err := s.Store.Geoadd(key, longitude, latitude, member)
+	if err != nil {
+		return resp.Err(err.Error())
+	}
+	return resp.NewData(resp.Integer, n)
+}
+
+func HandleGeoPos(c *client.Client) resp.Data {
+	args := c.Command.Args
+	if len(args) != 2 {
+		return resp.WrongArgs("geoadd")
+	}
+	key := args[0]
+
+	member := args[3]
+
+	cords, err := s.Store.GeoPos(key, member)
+	if err != nil {
+		return resp.Err(err.Error())
+	}
+	if cords == nil {
+		return resp.NewData(resp.Array)
+	}
+	return resp.NewData(resp.Array, cords.Longitude, cords.Latitude)
+}
