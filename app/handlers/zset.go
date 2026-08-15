@@ -143,19 +143,23 @@ func HandleGeoAdd(c *client.Client) resp.Data {
 
 func HandleGeoPos(c *client.Client) resp.Data {
 	args := c.Command.Args
-	if len(args) != 2 {
-		return resp.WrongArgs("geoadd")
+	if len(args) < 2 {
+		return resp.WrongArgs("geopos")
 	}
 	key := args[0]
 
-	member := args[3]
-
-	cords, err := s.Store.GeoPos(key, member)
+	cords, err := s.Store.GeoPos(key, args[1:])
 	if err != nil {
 		return resp.Err(err.Error())
 	}
-	if cords == nil {
-		return resp.NewData(resp.Array)
+
+	response := make([]resp.Data, 0)
+	for _, cord := range cords {
+		if cord == nil {
+			response = append(response, resp.NewData(resp.Array))
+		} else {
+			response = append(response, resp.NewData(resp.Array, cord.Longitude, cord.Latitude))
+		}
 	}
-	return resp.NewData(resp.Array, cords.Longitude, cords.Latitude)
+	return resp.NewData(resp.Array, response)
 }

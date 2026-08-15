@@ -317,7 +317,7 @@ func (rs *RedisStore) Geoadd(key string, long float64, lat float64, member strin
 	return inserts, nil
 }
 
-func (rs *RedisStore) GeoPos(key string, member string) (*Coordinates, error) {
+func (rs *RedisStore) GeoPos(key string, members []string) ([]*Coordinates, error) {
 	val, ok := rs.Look(key)
 	if !ok {
 		return nil, nil
@@ -327,13 +327,22 @@ func (rs *RedisStore) GeoPos(key string, member string) (*Coordinates, error) {
 		return nil, err
 	}
 
-	z, ok := zset.dict[member]
-	if !ok {
-		return nil, nil
+	answers := make([]*Coordinates, len(members))
+
+	for _, member := range members {
+		z, ok := zset.dict[member]
+		if ok {
+			geoCode := uint64(z.score)
+			cords := decode(geoCode)
+			if inRange(cords.Longitude, cords.Latitude) {
+				answers = append(answers, &cords)
+			} else {
+				answers = append(answers, &Coordinates{})
+			}
+		} else {
+			answers = append(answers, nil)
+		}
 	}
-	geoCode := uint64(z.score)
 
-	cords := decode(geoCode)
-
-	return &cords, nil
+	return answers, nil
 }
