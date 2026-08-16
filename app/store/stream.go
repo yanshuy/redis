@@ -160,7 +160,7 @@ func parseStreamIDBound(s string, isEnd bool) (StreamID, error) {
 	return StreamID{}, errors.New("invalid arguments")
 }
 
-func (rs *RedisStore) XRange(key string, startStr string, endStr string) ([]StreamEntry, error) {
+func (rs *RedisStore) Xrange(key string, startStr string, endStr string) ([]StreamEntry, error) {
 	val, exists := rs.Look(key)
 	if !exists {
 		return nil, nil
@@ -190,7 +190,7 @@ func (rs *RedisStore) XRange(key string, startStr string, endStr string) ([]Stre
 	return entries, nil
 }
 
-func (rs *RedisStore) XRead(key string, startIDStr string) ([]StreamEntry, error) {
+func (rs *RedisStore) Xread(key string, startIDStr string) ([]StreamEntry, error) {
 	val, exists := rs.Look(key)
 	if !exists {
 		return nil, nil

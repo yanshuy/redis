@@ -18,12 +18,6 @@ var (
 	SLAVE  = client.SLAVE
 )
 
-type Config struct {
-	port       string
-	Dir        string
-	Dbfilename string
-}
-
 type Server struct {
 	Role              client.Role
 	replicaof         string
@@ -119,13 +113,27 @@ func HandleRequests(c *client.Client, reqChan chan<- client.Request) {
 	}
 }
 
+type Config struct {
+	port           string
+	Dir            string
+	Dbfilename     string
+	Appendonly     string
+	Appenddirname  string
+	Appendfilename string
+	Appendfsync    string
+}
+
 func NewConfig() Config {
 	dir := *dirFlag
 	dbfilename := *dbFileFlag
 	return Config{
-		port:       *portFlag,
-		Dir:        dir,
-		Dbfilename: dbfilename,
+		port:           *portFlag,
+		Dir:            dir,
+		Dbfilename:     dbfilename,
+		Appendonly:     "no",
+		Appenddirname:  "appendonlydir",
+		Appendfilename: "appendonly.aof",
+		Appendfsync:    "everysec",
 	}
 }
 
@@ -138,6 +146,14 @@ func (config *Config) GetConfig(args []string) ([]string, error) {
 			val = config.Dir
 		case "dbfilename":
 			val = config.Dbfilename
+		case "appendonly":
+			val = config.Appendonly
+		case "appenddirname":
+			val = config.Appenddirname
+		case "appendfilename":
+			val = config.Appendfilename
+		case "appendfsync":
+			val = config.Appendfsync
 		default:
 			continue
 		}

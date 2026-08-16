@@ -36,7 +36,7 @@ func HandleXrange(c *client.Client) resp.Data {
 	startStr := args[1]
 	endStr := args[2]
 
-	entries, err := s.Store.XRange(key, startStr, endStr)
+	entries, err := s.Store.Xrange(key, startStr, endStr)
 	if err != nil {
 		return resp.Err(err.Error())
 	}
