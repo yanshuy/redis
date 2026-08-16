@@ -77,7 +77,7 @@ func Init() *Server {
 	config := NewConfig()
 
 	if config.Appendonly == "yes" {
-		path := filepath.Join(config.Dir, config.Appenddirname, config.Appendfilename)
+		path := filepath.Join(config.Dir, config.Appenddirname, config.Appendfilename, ".1.incr.aof")
 		file, err := OpenAOF(path)
 		if err != nil {
 			log.Fatal(err)
