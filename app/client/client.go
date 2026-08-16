@@ -7,6 +7,7 @@ import (
 	"time"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
+	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
 
 type Command struct {
@@ -121,11 +122,11 @@ func (c *Client) Wait(timeout time.Duration, onTimeout func(), onSuccess func())
 		c.UnBlock()
 
 		if ctx.Err() == context.Canceled {
-			BlopChan <- onSuccess
+			server.Svr.BlopChan <- onSuccess
 		}
 
 		if ctx.Err() == context.DeadlineExceeded {
-			BlopChan <- onTimeout
+			server.Svr.BlopChan <- onTimeout
 			cancel()
 		}
 	}()
