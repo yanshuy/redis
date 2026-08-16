@@ -91,7 +91,7 @@ func HandleWait(c *client.Client) resp.Data {
 		c.QueueMessage(resp.NewData(resp.Integer, s.CountSyncedReplicas(targetOffset)))
 	}
 	duration := time.Duration(timeout_s * float64(time.Millisecond))
-	c.Wait(duration, f, f)
+	Wait(c, duration, f, f)
 
 	getack := resp.NewData(resp.Array, []string{"REPLCONF", "GETACK", "*"})
 	for slave := range s.Replicas {

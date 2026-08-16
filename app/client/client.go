@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"time"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
-	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
 
 type Command struct {
@@ -103,33 +101,6 @@ func (c *Client) Block() {
 func (c *Client) UnBlock() {
 	c.Blocked = false
 	close(c.Unblock)
-}
-
-func (c *Client) Wait(timeout time.Duration, onTimeout func(), onSuccess func()) {
-	var ctx context.Context
-	var cancel context.CancelFunc
-	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(context.Background(), timeout)
-	} else {
-		ctx, cancel = context.WithCancel(context.Background())
-	}
-	c.Blop.Cancel = cancel
-
-	c.Block()
-	go func() {
-		<-ctx.Done()
-		c.Blocked = false
-		c.UnBlock()
-
-		if ctx.Err() == context.Canceled {
-			server.Svr.BlopChan <- onSuccess
-		}
-
-		if ctx.Err() == context.DeadlineExceeded {
-			server.Svr.BlopChan <- onTimeout
-			cancel()
-		}
-	}()
 }
 
 func (c *Client) InSubscribeMode() bool {

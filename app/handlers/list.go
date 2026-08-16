@@ -140,10 +140,13 @@ func HandleBlpop(c *client.Client) resp.Data {
 	}
 
 	duration := time.Duration(timeout_s * float64(time.Second))
-	c.Wait(duration, func() {
-		c.QueueMessage(resp.NewData(resp.Array))
-		removeClient()
-	}, removeClient)
+	Wait(c, duration,
+		func() {
+			c.QueueMessage(resp.NewData(resp.Array))
+			removeClient()
+		},
+		removeClient,
+	)
 
 	return resp.None()
 }

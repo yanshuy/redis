@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"time"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
@@ -238,4 +240,31 @@ func Multi(next MiddlewareFunc) MiddlewareFunc {
 			return resp.NewData(resp.String, "QUEUED")
 		}
 	}
+}
+
+func Wait(c *client.Client, timeout time.Duration, onTimeout func(), onSuccess func()) {
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
+	} else {
+		ctx, cancel = context.WithCancel(context.Background())
+	}
+	c.Blop.Cancel = cancel
+
+	c.Block()
+	go func() {
+		<-ctx.Done()
+		c.Blocked = false
+		c.UnBlock()
+
+		if ctx.Err() == context.Canceled {
+			s.BlopChan <- onSuccess
+		}
+
+		if ctx.Err() == context.DeadlineExceeded {
+			s.BlopChan <- onTimeout
+			cancel()
+		}
+	}()
 }
