@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"path/filepath"
 	"strings"
 
 	"github.com/codecrafters-io/redis-starter-go/app/client"
@@ -122,7 +123,10 @@ type Config struct {
 }
 
 func NewConfig() Config {
-	dir := *dirFlag
+	dir, err := filepath.Abs(*dirFlag)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 	dbfilename := *dbFileFlag
 	return Config{
 		port:           *portFlag,
