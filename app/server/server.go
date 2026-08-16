@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"path/filepath"
 
 	"github.com/codecrafters-io/redis-starter-go/app/client"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
@@ -27,6 +29,7 @@ type Server struct {
 	Store     *store.RedisStore
 	Replicas  map[*client.Client]int
 	BlClients []*client.Client
+	Aof       *os.File
 
 	ReqChan  chan client.Request
 	BlopChan chan func()
@@ -58,8 +61,30 @@ var (
 	replicaofFlag = flag.String("replicaof", "", "replica of")
 )
 
+func OpenAOF(filePath string) (*os.File, error) {
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+	return file, nil
+}
+
 func Init() *Server {
 	config := NewConfig()
+
+	if config.Appendonly == "yes" {
+		path := filepath.Join(config.Dir, config.Appenddirname, config.Appendfilename)
+		file, err := OpenAOF(path)
+		if err != nil {
+			log.Fatal(err)
+		}
+		Svr.Aof = file
+	}
+
 	store, err := store.InitializeStore(config.Dir, config.Dbfilename)
 	if err != nil {
 		log.Fatal(err)

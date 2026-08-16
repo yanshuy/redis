@@ -3,7 +3,6 @@ package server
 import (
 	"flag"
 	"log"
-	"os"
 	"path/filepath"
 	"strings"
 )
@@ -32,25 +31,14 @@ func NewConfig() Config {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	dbfilename := *dbFileFlag
-	appendonly := *appendonlyFlag
-	appenddirname := *appenddirnameFlag
-	appendfilename := *appendfilenameFlag
-
-	if appendonly == "yes" {
-		dir := filepath.Join(dir, appenddirname)
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			log.Fatal(err)
-		}
-	}
 
 	return Config{
 		port:           *portFlag,
 		Dir:            dir,
-		Dbfilename:     dbfilename,
-		Appendonly:     appendonly,
-		Appenddirname:  appenddirname,
-		Appendfilename: appendfilename,
+		Dbfilename:     *dbFileFlag,
+		Appendonly:     *appendonlyFlag,
+		Appenddirname:  *appenddirnameFlag,
+		Appendfilename: *appendfilenameFlag,
 		Appendfsync:    *appendfsyncFlag,
 	}
 }
