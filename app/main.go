@@ -12,12 +12,9 @@ func main() {
 	flag.Parse()
 	s := server.Init()
 
-	reqChan := make(chan client.Request, 100)
-	go CommandLoop(s, reqChan, client.BlopChan)
+	go CommandLoop(s, s.ReqChan, s.BlopChan)
 
-	s.Run(func(c *client.Client) {
-		server.HandleRequests(c, reqChan)
-	})
+	s.Run()
 }
 
 func CommandLoop(s *server.Server, reqChan <-chan client.Request, blopChan <-chan func()) {

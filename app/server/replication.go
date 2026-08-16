@@ -16,7 +16,7 @@ import (
 func (s *Server) NewReplica(c *client.Client) error {
 	c.MakeSlave()
 
-	str := []string{"FULLRESYNC", Global.ReplicationId, strconv.Itoa(Global.ReplicationOffset)}
+	str := []string{"FULLRESYNC", Svr.ReplicationId, strconv.Itoa(Svr.ReplicationOffset)}
 	res := resp.NewData(resp.String, strings.Join(str, " "))
 
 	_, err := c.Conn.Write(res.ToResponse())
@@ -28,7 +28,7 @@ func (s *Server) NewReplica(c *client.Client) error {
 		return err
 	}
 
-	Global.Replicas[c] = 0
+	Svr.Replicas[c] = 0
 	return nil
 }
 

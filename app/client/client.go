@@ -64,8 +64,6 @@ func NewClient(conn net.Conn, role Role) *Client {
 	return c
 }
 
-var BlopChan = make(chan func())
-
 func (c *Client) MakeSlave() {
 	c.Role = SLAVE
 	close(c.messageChan)

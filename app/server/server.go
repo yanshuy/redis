@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"path/filepath"
-	"strings"
 
 	"github.com/codecrafters-io/redis-starter-go/app/client"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
@@ -29,13 +27,16 @@ type Server struct {
 	Store     *store.RedisStore
 	Replicas  map[*client.Client]int
 	BlClients []*client.Client
+
+	ReqChan  chan client.Request
+	BlopChan chan func()
 }
 
 func (s *Server) ReplicaCount() int {
 	return len(s.Replicas)
 }
 
-var Global *Server
+var Svr *Server
 
 func NewServer(role client.Role, config Config, store *store.RedisStore) *Server {
 	s := &Server{
@@ -46,13 +47,13 @@ func NewServer(role client.Role, config Config, store *store.RedisStore) *Server
 		ReplicationId:     generateRandID(),
 		ReplicationOffset: 0,
 		Replicas:          make(map[*client.Client]int),
+		ReqChan:           make(chan client.Request, 100),
+		BlopChan:          make(chan func(), 100),
 	}
 	return s
 }
 
 var (
-	dirFlag       = flag.String("dir", ".", "Directory for RDB persistence")
-	dbFileFlag    = flag.String("dbfilename", "rdb.snapshot", "RDB file name")
 	portFlag      = flag.String("port", "6379", "port")
 	replicaofFlag = flag.String("replicaof", "", "replica of")
 )
@@ -65,14 +66,14 @@ func Init() *Server {
 	}
 
 	if *replicaofFlag == "" {
-		Global = NewServer(MASTER, config, store)
+		Svr = NewServer(MASTER, config, store)
 	} else {
-		Global = NewServer(SLAVE, config, store)
+		Svr = NewServer(SLAVE, config, store)
 	}
-	return Global
+	return Svr
 }
 
-func (s *Server) Run(handleConn func(c *client.Client)) {
+func (s *Server) Run() {
 	port := s.Config.port
 
 	l, err := net.Listen("tcp", "0.0.0.0:"+port)
@@ -85,7 +86,7 @@ func (s *Server) Run(handleConn func(c *client.Client)) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		go handleConn(master)
+		go s.HandleRequests(master)
 	}
 
 	for {
@@ -95,11 +96,11 @@ func (s *Server) Run(handleConn func(c *client.Client)) {
 			continue
 		}
 		c := client.NewClient(conn, client.CLIENT)
-		go handleConn(c)
+		go s.HandleRequests(c)
 	}
 }
 
-func HandleRequests(c *client.Client, reqChan chan<- client.Request) {
+func (s *Server) HandleRequests(c *client.Client) {
 	defer c.Close()
 
 	for {
@@ -108,60 +109,8 @@ func HandleRequests(c *client.Client, reqChan chan<- client.Request) {
 			log.Println("error reading", err)
 			return
 		}
-		reqChan <- req
+		s.ReqChan <- req
 	}
-}
-
-type Config struct {
-	port           string
-	Dir            string
-	Dbfilename     string
-	Appendonly     string
-	Appenddirname  string
-	Appendfilename string
-	Appendfsync    string
-}
-
-func NewConfig() Config {
-	dir, err := filepath.Abs(*dirFlag)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	dbfilename := *dbFileFlag
-	return Config{
-		port:           *portFlag,
-		Dir:            dir,
-		Dbfilename:     dbfilename,
-		Appendonly:     "no",
-		Appenddirname:  "appendonlydir",
-		Appendfilename: "appendonly.aof",
-		Appendfsync:    "everysec",
-	}
-}
-
-func (config *Config) GetConfig(args []string) ([]string, error) {
-	result := make([]string, 0)
-	for _, arg := range args {
-		var val string
-		switch strings.ToLower(arg) {
-		case "dir":
-			val = config.Dir
-		case "dbfilename":
-			val = config.Dbfilename
-		case "appendonly":
-			val = config.Appendonly
-		case "appenddirname":
-			val = config.Appenddirname
-		case "appendfilename":
-			val = config.Appendfilename
-		case "appendfsync":
-			val = config.Appendfsync
-		default:
-			continue
-		}
-		result = append(result, arg, val)
-	}
-	return result, nil
 }
 
 func generateRandID() string {

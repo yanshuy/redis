@@ -6,7 +6,6 @@ import (
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
-	"github.com/codecrafters-io/redis-starter-go/app/server"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
@@ -201,20 +200,20 @@ func HandleWatch(c *client.Client) resp.Data {
 	args := c.Command.Args
 	for _, key := range args {
 		c.WatchingKeys.Add(key)
-		server.Global.Store.WatchedKeys[key] = append(server.Global.Store.WatchedKeys[key], c)
+		s.Store.WatchedKeys[key] = append(s.Store.WatchedKeys[key], c)
 	}
 	return resp.NewData(resp.String, "OK")
 }
 
 func HandleUnWatch(c *client.Client) resp.Data {
 	for key := range c.WatchingKeys {
-		clients := server.Global.Store.WatchedKeys[key]
+		clients := s.Store.WatchedKeys[key]
 		clients = filter(clients, c)
 
 		if len(clients) == 0 {
-			delete(server.Global.Store.WatchedKeys, key)
+			delete(s.Store.WatchedKeys, key)
 		} else {
-			server.Global.Store.WatchedKeys[key] = clients
+			s.Store.WatchedKeys[key] = clients
 		}
 	}
 	clear(c.WatchingKeys)

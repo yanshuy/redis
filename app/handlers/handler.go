@@ -15,7 +15,7 @@ var s *server.Server
 var handler = Chain(HandleCmd, Auth, SubscribeMode, Multi)
 
 func HandleRequest(req client.Request) {
-	s = server.Global // crime
+	s = server.Svr // crime
 
 	c := req.Client
 	c.Command = req.Cmd
