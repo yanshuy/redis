@@ -76,7 +76,10 @@ func OpenAOF(filePath string) (*os.File, error) {
 		return nil, err
 	}
 	line := fmt.Sprintf("file %s seq 1 type i", aofFilePath)
-	manifestFile.Write([]byte(line))
+	_, err = manifestFile.Write([]byte(line))
+	if err != nil {
+		return nil, err
+	}
 	_ = manifestFile
 	return file, nil
 }
