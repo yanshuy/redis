@@ -133,10 +133,17 @@ func HandleBlpop(c *client.Client) resp.Data {
 		s.Store.BlockedKeys[key] = append(s.Store.BlockedKeys[key], c)
 	}
 
+	removeClient := func() {
+		for _, key := range keys {
+			s.Store.BlockedKeys[key] = filter(s.Store.BlockedKeys[key], c)
+		}
+	}
+
 	duration := time.Duration(timeout_s * float64(time.Second))
 	c.Wait(duration, func() {
 		c.QueueMessage(resp.NewData(resp.Array))
-	}, func() {})
+		removeClient()
+	}, removeClient)
 
 	return resp.None()
 }

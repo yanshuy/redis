@@ -118,9 +118,9 @@ func (c *Client) Wait(timeout time.Duration, onTimeout func(), onSuccess func())
 
 	c.Block()
 	go func() {
-		defer c.UnBlock()
-
 		<-ctx.Done()
+		c.Blocked = false
+		c.UnBlock()
 
 		if ctx.Err() == context.Canceled {
 			BlopChan <- onSuccess

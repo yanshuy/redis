@@ -19,8 +19,8 @@ func (rs *RedisStore) NotifyBlockedClient(key string, values []string) []string 
 			rs.BlockedKeys[key] = blocked[i:]
 			return remainingValues
 		}
-		c.QueueMessage(resp.NewData(resp.Array, []string{key, remainingValues[0]}))
 		c.Blop.Cancel()
+		c.QueueMessage(resp.NewData(resp.Array, []string{key, remainingValues[0]}))
 		remainingValues = remainingValues[1:]
 	}
 
