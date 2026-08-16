@@ -63,13 +63,21 @@ var (
 
 func OpenAOF(filePath string) (*os.File, error) {
 	dir := filepath.Dir(filePath)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, err
 	}
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
+	aofFilePath := filePath + ".1.incr.aof"
+	file, err := os.OpenFile(aofFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
 	if err != nil {
 		return nil, err
 	}
+	manifestFile, err := os.OpenFile(filePath+".manifest", os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+	line := fmt.Sprintf("file %s seq 1 type i", aofFilePath)
+	manifestFile.Write([]byte(line))
+	_ = manifestFile
 	return file, nil
 }
 
@@ -78,8 +86,7 @@ func Init() *Server {
 
 	var file *os.File
 	if config.Appendonly == "yes" {
-		path := filepath.Join(config.Dir, config.Appenddirname, config.Appendfilename+".1.incr.aof")
-		println(path)
+		path := filepath.Join(config.Dir, config.Appenddirname, config.Appendfilename)
 		var err error
 		file, err = OpenAOF(path)
 		if err != nil {
