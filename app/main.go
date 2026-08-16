@@ -1,12 +1,15 @@
 package main
 
 import (
+	"flag"
+
 	"github.com/codecrafters-io/redis-starter-go/app/client"
 	handler "github.com/codecrafters-io/redis-starter-go/app/handlers"
 	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
 
 func main() {
+	flag.Parse()
 	s := server.Init()
 
 	reqChan := make(chan client.Request, 100)

@@ -220,7 +220,7 @@ func decodeLength(b []byte) (int, int, bool) {
 }
 
 func RestoreRDBSnapshot(rs *RedisStore) error {
-	file, err := rs.GetRDBFile(os.O_RDONLY | os.O_CREATE)
+	file, err := rs.GetRDBFile(os.O_RDONLY)
 	if err != nil {
 		return nil
 	}

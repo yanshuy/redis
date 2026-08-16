@@ -50,15 +50,13 @@ func NewServer(role client.Role, config Config, store *store.RedisStore) *Server
 }
 
 var (
-	dirFlag       = flag.String("dir", "tmp", "Directory for RDB persistence")
+	dirFlag       = flag.String("dir", ".", "Directory for RDB persistence")
 	dbFileFlag    = flag.String("dbfilename", "rdb.snapshot", "RDB file name")
 	portFlag      = flag.String("port", "6379", "port")
 	replicaofFlag = flag.String("replicaof", "", "replica of")
 )
 
 func Init() *Server {
-	flag.Parse()
-
 	config := NewConfig()
 	store, err := store.InitializeStore(config.Dir, config.Dbfilename)
 	if err != nil {
