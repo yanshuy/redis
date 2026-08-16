@@ -55,6 +55,7 @@ func (s *Server) CountSyncedReplicas(targetOffset int) int {
 	return count
 }
 
+// slave
 func (s *Server) HandshakeMaster() (*client.Client, error) {
 	parts := strings.Fields(s.replicaof)
 	host := parts[0]
