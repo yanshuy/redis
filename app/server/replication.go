@@ -32,14 +32,12 @@ func (s *Server) NewReplica(c *client.Client) error {
 	return nil
 }
 
-func (s *Server) Propagate(cmd client.Command) {
+func (s *Server) Propagate(cmd []byte) {
 	if s.Role == client.MASTER {
-		cmd := cmd.ToRESP()
-		raw := cmd.ToResponse()
-		s.ReplicationOffset += len(raw)
+		s.ReplicationOffset += len(cmd)
 		go func() {
 			for slave := range s.Replicas {
-				slave.Conn.Write(raw)
+				slave.Conn.Write(cmd)
 			}
 		}()
 	}

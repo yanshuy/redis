@@ -10,14 +10,14 @@ import (
 type Request struct {
 	Client *Client
 	Cmd    Command
-	CmdLen int
+	CmdRaw []byte
 }
 
 func (c *Client) ReadRequest() (Request, error) {
 	if c.Blocked {
 		<-c.Unblock
 	}
-	d, cmdLen, err := c.Reader.Read_RESP(c.Conn)
+	d, raw, err := c.Reader.Read_RESP(c.Conn)
 	if err != nil {
 		return Request{}, err
 	}
@@ -25,7 +25,7 @@ func (c *Client) ReadRequest() (Request, error) {
 	if err != nil {
 		return Request{}, err
 	}
-	return Request{Client: c, Cmd: cmd, CmdLen: cmdLen}, nil
+	return Request{Client: c, Cmd: cmd, CmdRaw: raw}, nil
 }
 
 func ValidateCommand(req resp.Data) (Command, error) {

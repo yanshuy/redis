@@ -19,30 +19,31 @@ func NewReader() *Reader {
 	}
 }
 
-func (r *Reader) Read_RESP(conn io.Reader) (resp.Data, int, error) {
+func (r *Reader) Read_RESP(conn io.Reader) (resp.Data, []byte, error) {
 	b := r.buf
 
 	for {
 		if r.off > 0 {
-			req, o, err := resp.Parse(b[:r.off])
+			buf := b[:r.off]
+			req, o, err := resp.Parse(buf)
 			if err != nil {
-				return req, 0, err
+				return req, nil, err
 			}
 			if o > 0 {
 				copy(b, b[o:r.off])
 				r.off -= o
-				return req, o, nil
+				return req, buf, nil
 			}
 		}
 
 		if r.off == len(b) {
-			return resp.Data{}, 0, errors.New("request too large")
+			return resp.Data{}, nil, errors.New("request too large")
 		}
 
 		n, err := conn.Read(b[r.off:])
 		r.off += n
 		if err != nil {
-			return resp.Data{}, 0, err
+			return resp.Data{}, nil, err
 		}
 	}
 }

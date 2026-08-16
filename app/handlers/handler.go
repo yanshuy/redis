@@ -21,10 +21,11 @@ func HandleRequest(req client.Request) {
 
 	c := req.Client
 	c.Command = req.Cmd
+	c.CommandRaw = req.CmdRaw
 
 	res := handler(c)
 	if c.Role == client.MASTER {
-		s.ReplicationOffset += req.CmdLen
+		s.ReplicationOffset += len(req.CmdRaw)
 	} else {
 		c.QueueMessage(res)
 	}

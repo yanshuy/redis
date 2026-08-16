@@ -18,7 +18,8 @@ type Client struct {
 	authAsUser *User
 	Role       Role
 
-	Command Command
+	Command    Command
+	CommandRaw []byte
 
 	subscriptions Set[string]
 	messageChan   chan PubMessage

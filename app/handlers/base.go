@@ -50,7 +50,11 @@ func HandleSet(c *client.Client) resp.Data {
 	}
 
 	s.Store.Set(key, val, expiry)
-	s.Propagate(c.Command)
+	s.Propagate(c.CommandRaw)
+	if s.Aof != nil {
+		s.Aof.Write(c.CommandRaw)
+		s.Aof.Sync()
+	}
 	return resp.NewData(resp.String, "OK")
 }
 
