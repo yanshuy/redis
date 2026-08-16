@@ -61,41 +61,36 @@ var (
 	replicaofFlag = flag.String("replicaof", "", "replica of")
 )
 
-func OpenAOF(filePath string) (*os.File, error) {
+func InitAOF(filePath string) (*os.File, error) {
 	dir := filepath.Dir(filePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, err
 	}
 	aofFilePath := filePath + ".1.incr.aof"
-	file, err := os.OpenFile(aofFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
+	file, err := os.OpenFile(aofFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return nil, err
 	}
-	manifestFile, err := os.OpenFile(filePath+".manifest", os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
+
+	manifestPath := filePath + ".manifest"
+	manifestFile, err := os.OpenFile(manifestPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
+		file.Close()
 		return nil, err
 	}
-	line := fmt.Sprintf("file %s seq 1 type i", aofFilePath)
-	_, err = manifestFile.Write([]byte(line))
-	if err != nil {
+	defer manifestFile.Close()
+
+	line := fmt.Sprintf("file %s seq 1 type i\n", filepath.Base(aofFilePath))
+	if _, err := manifestFile.WriteString(line); err != nil {
+		file.Close()
 		return nil, err
 	}
-	_ = manifestFile
+
 	return file, nil
 }
 
 func Init() *Server {
 	config := NewConfig()
-
-	var file *os.File
-	if config.Appendonly == "yes" {
-		path := filepath.Join(config.Dir, config.Appenddirname, config.Appendfilename)
-		var err error
-		file, err = OpenAOF(path)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
 
 	store, err := store.InitializeStore(config.Dir, config.Dbfilename)
 	if err != nil {
@@ -107,7 +102,16 @@ func Init() *Server {
 	} else {
 		Svr = NewServer(SLAVE, config, store)
 	}
-	Svr.Aof = file
+
+	if config.Appendonly == "yes" {
+		path := filepath.Join(config.Dir, config.Appenddirname, config.Appendfilename)
+		file, err := InitAOF(path)
+		if err != nil {
+			log.Fatal(err)
+		}
+		Svr.Aof = file
+	}
+
 	return Svr
 }
 
