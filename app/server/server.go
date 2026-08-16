@@ -76,13 +76,15 @@ func OpenAOF(filePath string) (*os.File, error) {
 func Init() *Server {
 	config := NewConfig()
 
+	var file *os.File
 	if config.Appendonly == "yes" {
-		path := filepath.Join(config.Dir, config.Appenddirname, config.Appendfilename, ".1.incr.aof")
-		file, err := OpenAOF(path)
+		path := filepath.Join(config.Dir, config.Appenddirname, config.Appendfilename+".1.incr.aof")
+		println(path)
+		var err error
+		file, err = OpenAOF(path)
 		if err != nil {
 			log.Fatal(err)
 		}
-		Svr.Aof = file
 	}
 
 	store, err := store.InitializeStore(config.Dir, config.Dbfilename)
@@ -95,6 +97,7 @@ func Init() *Server {
 	} else {
 		Svr = NewServer(SLAVE, config, store)
 	}
+	Svr.Aof = file
 	return Svr
 }
 
