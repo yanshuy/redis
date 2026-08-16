@@ -30,9 +30,11 @@ func (r *Reader) Read_RESP(conn io.Reader) (resp.Data, []byte, error) {
 				return req, nil, err
 			}
 			if o > 0 {
+				raw := make([]byte, o)
+				copy(raw, b[:o])
 				copy(b, b[o:r.off])
 				r.off -= o
-				return req, buf, nil
+				return req, raw, nil
 			}
 		}
 
