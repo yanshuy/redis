@@ -19,7 +19,11 @@ func NewReader() *Reader {
 	}
 }
 
-func (r *Reader) Read_RESP(conn io.Reader) (resp.Data, []byte, error) {
+func (r *Reader) Reset() {
+	r.off = 0
+}
+
+func (r *Reader) Read_RESP(reader io.Reader) (resp.Data, []byte, error) {
 	b := r.buf
 
 	for {
@@ -42,7 +46,7 @@ func (r *Reader) Read_RESP(conn io.Reader) (resp.Data, []byte, error) {
 			return resp.Data{}, nil, errors.New("request too large")
 		}
 
-		n, err := conn.Read(b[r.off:])
+		n, err := reader.Read(b[r.off:])
 		r.off += n
 		if err != nil {
 			return resp.Data{}, nil, err

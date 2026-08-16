@@ -10,7 +10,6 @@ import (
 type Request struct {
 	Client *Client
 	Cmd    Command
-	CmdRaw []byte
 }
 
 func (c *Client) ReadRequest() (Request, error) {
@@ -22,10 +21,11 @@ func (c *Client) ReadRequest() (Request, error) {
 		return Request{}, err
 	}
 	cmd, err := ValidateCommand(d)
+	cmd.Raw = raw
 	if err != nil {
 		return Request{}, err
 	}
-	return Request{Client: c, Cmd: cmd, CmdRaw: raw}, nil
+	return Request{Client: c, Cmd: cmd}, nil
 }
 
 func ValidateCommand(req resp.Data) (Command, error) {

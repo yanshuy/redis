@@ -8,8 +8,8 @@ import (
 	"log"
 	"net"
 	"os"
-	"path/filepath"
 
+	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
 	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
@@ -24,15 +24,17 @@ type Server struct {
 	replicaof         string
 	ReplicationId     string
 	ReplicationOffset int
+	Config            Config
 
-	Config    Config
 	Store     *store.RedisStore
 	Replicas  map[*client.Client]int
 	BlClients []*client.Client
 	Aof       *os.File
 
-	ReqChan  chan client.Request
-	BlopChan chan func()
+	ReqChan    chan client.Request
+	ReqHandler func(req client.Request)
+	CmdHandler func(*client.Client) resp.Data
+	BlopChan   chan func()
 }
 
 func (s *Server) ReplicaCount() int {
@@ -61,34 +63,6 @@ var (
 	replicaofFlag = flag.String("replicaof", "", "replica of")
 )
 
-func InitAOF(filePath string) (*os.File, error) {
-	dir := filepath.Dir(filePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, err
-	}
-	aofFilePath := filePath + ".1.incr.aof"
-	file, err := os.OpenFile(aofFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		return nil, err
-	}
-
-	manifestPath := filePath + ".manifest"
-	manifestFile, err := os.OpenFile(manifestPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		file.Close()
-		return nil, err
-	}
-	defer manifestFile.Close()
-
-	line := fmt.Sprintf("file %s seq 1 type i\n", filepath.Base(aofFilePath))
-	if _, err := manifestFile.WriteString(line); err != nil {
-		file.Close()
-		return nil, err
-	}
-
-	return file, nil
-}
-
 func Init() *Server {
 	config := NewConfig()
 
@@ -101,15 +75,6 @@ func Init() *Server {
 		Svr = NewServer(MASTER, config, store)
 	} else {
 		Svr = NewServer(SLAVE, config, store)
-	}
-
-	if config.Appendonly == "yes" {
-		path := filepath.Join(config.Dir, config.Appenddirname, config.Appendfilename)
-		file, err := InitAOF(path)
-		if err != nil {
-			log.Fatal(err)
-		}
-		Svr.Aof = file
 	}
 
 	return Svr
@@ -131,6 +96,8 @@ func (s *Server) Run() {
 		go s.HandleRequests(master)
 	}
 
+	go s.CommandLoop()
+
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -139,6 +106,17 @@ func (s *Server) Run() {
 		}
 		c := client.NewClient(conn, client.CLIENT)
 		go s.HandleRequests(c)
+	}
+}
+
+func (s *Server) CommandLoop() {
+	for {
+		select {
+		case req := <-Svr.ReqChan:
+			s.ReqHandler(req)
+		case op := <-Svr.BlopChan:
+			op()
+		}
 	}
 }
 

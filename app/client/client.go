@@ -11,6 +11,7 @@ import (
 type Command struct {
 	Name string
 	Args []string
+	Raw  []byte
 }
 
 type Client struct {
@@ -18,8 +19,7 @@ type Client struct {
 	authAsUser *User
 	Role       Role
 
-	Command    Command
-	CommandRaw []byte
+	Command Command
 
 	subscriptions Set[string]
 	messageChan   chan PubMessage

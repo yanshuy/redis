@@ -2,28 +2,22 @@ package main
 
 import (
 	"flag"
+	"log"
 
-	"github.com/codecrafters-io/redis-starter-go/app/client"
 	handler "github.com/codecrafters-io/redis-starter-go/app/handlers"
 	"github.com/codecrafters-io/redis-starter-go/app/server"
 )
 
 func main() {
 	flag.Parse()
-	s := server.Init()
 
-	go CommandLoop(s, s.ReqChan, s.BlopChan)
+	s := server.Init()
+	s.ReqHandler = handler.HandleRequest
+	s.CmdHandler = handler.HandleCmd
+
+	if err := s.InitAOF(); err != nil {
+		log.Fatal(err)
+	}
 
 	s.Run()
-}
-
-func CommandLoop(s *server.Server, reqChan <-chan client.Request, blopChan <-chan func()) {
-	for {
-		select {
-		case req := <-reqChan:
-			handler.HandleRequest(req)
-		case t := <-blopChan:
-			t()
-		}
-	}
 }
