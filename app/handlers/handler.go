@@ -255,13 +255,13 @@ func Wait(c *client.Client, timeout time.Duration, onCancel func(), onTimeout fu
 	c.Blop.Cancel = func() {
 		onCancel()
 		cancel()
+		c.UnBlock()
 	}
 
 	c.Block()
 	go func() {
-		defer cancel()
-
 		<-ctx.Done()
+		cancel()
 
 		if ctx.Err() == context.DeadlineExceeded {
 			s.BlopChan <- func() {

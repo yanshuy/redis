@@ -39,7 +39,7 @@ func HandleReplconf(c *client.Client) resp.Data {
 			for _, blClient := range s.BlClients {
 				synced := s.CountSyncedReplicas(blClient.Blop.Reploffset)
 				if synced >= blClient.Blop.Numreplicas {
-					c.QueueMessage(resp.NewData(resp.Integer, synced))
+					blClient.QueueMessage(resp.NewData(resp.Integer, synced))
 					blClient.Blop.Cancel()
 				}
 			}
@@ -88,14 +88,14 @@ func HandleWait(c *client.Client) resp.Data {
 	s.BlClients = append(s.BlClients, c)
 
 	duration := time.Duration(timeout_s * float64(time.Millisecond))
-	cleanUp := func() {
+	onDone := func() {
 		s.BlClients = filter(s.BlClients, c)
 	}
 	timeout := func() {
 		c.QueueMessage(resp.NewData(resp.Integer, s.CountSyncedReplicas(targetOffset)))
-		cleanUp()
+		onDone()
 	}
-	Wait(c, duration, cleanUp, timeout)
+	Wait(c, duration, onDone, timeout)
 
 	getack := resp.NewData(resp.Array, []string{"REPLCONF", "GETACK", "*"})
 	for slave := range s.Replicas {
