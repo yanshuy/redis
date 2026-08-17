@@ -243,7 +243,7 @@ func Multi(next MiddlewareFunc) MiddlewareFunc {
 	}
 }
 
-func Wait(c *client.Client, timeout time.Duration, onTimeout func(), onSuccess func()) {
+func Wait(c *client.Client, timeout time.Duration, onCancel func(), onTimeout func()) {
 	var ctx context.Context
 	var cancel context.CancelFunc
 	if timeout > 0 {
@@ -251,21 +251,23 @@ func Wait(c *client.Client, timeout time.Duration, onTimeout func(), onSuccess f
 	} else {
 		ctx, cancel = context.WithCancel(context.Background())
 	}
-	c.Blop.Cancel = cancel
+	c.Blop.Ctx = ctx
+	c.Blop.Cancel = func() {
+		onCancel()
+		cancel()
+	}
 
 	c.Block()
 	go func() {
-		<-ctx.Done()
-		c.Blocked = false
-		c.UnBlock()
+		defer cancel()
 
-		if ctx.Err() == context.Canceled {
-			s.BlopChan <- onSuccess
-		}
+		<-ctx.Done()
 
 		if ctx.Err() == context.DeadlineExceeded {
-			s.BlopChan <- onTimeout
-			cancel()
+			s.BlopChan <- func() {
+				onTimeout()
+				c.UnBlock()
+			}
 		}
 	}()
 }

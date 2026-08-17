@@ -80,6 +80,17 @@ func Init() *Server {
 	return Svr
 }
 
+func (s *Server) CommandLoop() {
+	for {
+		select {
+		case req := <-Svr.ReqChan:
+			s.ReqHandler(req)
+		case op := <-Svr.BlopChan:
+			op()
+		}
+	}
+}
+
 func (s *Server) Run() {
 	port := s.Config.port
 
@@ -88,6 +99,8 @@ func (s *Server) Run() {
 		log.Fatal("Failed to bind to port 6379")
 	}
 
+	go s.CommandLoop()
+
 	if s.Role == client.SLAVE {
 		master, err := s.HandshakeMaster()
 		if err != nil {
@@ -95,8 +108,6 @@ func (s *Server) Run() {
 		}
 		go s.HandleRequests(master)
 	}
-
-	go s.CommandLoop()
 
 	for {
 		conn, err := l.Accept()
@@ -109,21 +120,13 @@ func (s *Server) Run() {
 	}
 }
 
-func (s *Server) CommandLoop() {
-	for {
-		select {
-		case req := <-Svr.ReqChan:
-			s.ReqHandler(req)
-		case op := <-Svr.BlopChan:
-			op()
-		}
-	}
-}
-
 func (s *Server) HandleRequests(c *client.Client) {
 	defer c.Close()
 
 	for {
+		if c.Blocked {
+			<-c.UnblockSig
+		}
 		req, err := c.ReadRequest()
 		if err != nil {
 			log.Println("error reading", err)

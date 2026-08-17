@@ -2,7 +2,9 @@ package handler
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
@@ -55,19 +57,33 @@ func HandleXrange(c *client.Client) resp.Data {
 
 func HandleXread(c *client.Client) resp.Data {
 	args := c.Command.Args
+	var duration time.Duration
+	blockMode := false
 
-	if strings.ToLower(args[0]) != "streams" {
+	if len(args) > 0 && strings.EqualFold(args[0], "block") {
+		if len(args) < 2 {
+			return resp.WrongArgs("xread")
+		}
+		timeout_ms, err := strconv.ParseUint(args[1], 10, 64)
+		if err != nil {
+			return resp.Err("timeout is not an integer or out of range")
+		}
+		duration = time.Duration(timeout_ms) * time.Millisecond
+		blockMode = true
+		args = args[2:]
+	}
+
+	if len(args) == 0 || !strings.EqualFold(args[0], "streams") {
 		return resp.WrongArgs("xread")
 	}
 	args = args[1:]
+	if len(args) == 0 || len(args)%2 != 0 {
+		return resp.WrongArgs("xread")
+	}
 
 	mid := len(args) / 2
 	streams := args[:mid]
 	ids := args[mid:]
-
-	if len(streams) != len(ids) {
-		return resp.WrongArgs("xread")
-	}
 
 	answers := make([]resp.Data, 0, len(streams))
 	for i, stream := range streams {
@@ -76,11 +92,10 @@ func HandleXread(c *client.Client) resp.Data {
 		if err != nil {
 			return resp.Err(err.Error())
 		}
-		answer := make([]resp.Data, 0)
+		answer := make([]resp.Data, 0, len(entries))
 		for _, entry := range entries {
 			id := fmt.Sprintf("%d-%d", entry.Id.MS, entry.Id.Seq)
 			fields := resp.NewData(resp.Array, entry.Fields)
-
 			entryArr := resp.NewData(resp.Array, id, fields)
 			answer = append(answer, entryArr)
 		}
@@ -88,5 +103,26 @@ func HandleXread(c *client.Client) resp.Data {
 		answers = append(answers, resp.NewData(resp.Array, stream, pack))
 	}
 
-	return resp.NewData(resp.Array, answers)
+	if !blockMode {
+		if len(answers) == 0 {
+			return resp.NewData(resp.Array)
+		}
+		return resp.NewData(resp.Array, answers)
+	}
+
+	for _, key := range streams {
+		s.Store.BlockedOnKeys[key] = append(s.Store.BlockedOnKeys[key], c)
+	}
+	cleanUp := func() {
+		for _, key := range streams {
+			s.Store.BlockedOnKeys[key] = filter(s.Store.BlockedOnKeys[key], c)
+		}
+	}
+	onTimeout := func() {
+		c.QueueMessage(resp.NewData(resp.Array))
+		cleanUp()
+	}
+	Wait(c, duration, cleanUp, onTimeout)
+
+	return resp.None()
 }

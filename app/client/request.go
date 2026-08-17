@@ -13,9 +13,6 @@ type Request struct {
 }
 
 func (c *Client) ReadRequest() (Request, error) {
-	if c.Blocked {
-		<-c.Unblock
-	}
 	d, raw, err := c.Reader.Read_RESP(c.Conn)
 	if err != nil {
 		return Request{}, err

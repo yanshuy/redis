@@ -7,6 +7,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
+	"github.com/codecrafters-io/redis-starter-go/app/client"
 )
 
 type StreamID struct {
@@ -108,11 +111,41 @@ func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (string, e
 
 	streamId := StreamID{MS: time_ms, Seq: seqNo}
 	stream.LastID = streamId
-	stream.Entries = append(stream.Entries, StreamEntry{Id: streamId, Fields: key_vals})
+	entry := StreamEntry{Id: streamId, Fields: key_vals}
+
+	if !rs.NotifyBlockedOnStream(key, entry) {
+		stream.Entries = append(stream.Entries, StreamEntry{Id: streamId, Fields: key_vals})
+	}
 	val.Obj = stream
 
 	rs.TouchWatchedKey(key)
 	return fmt.Sprintf("%d-%d", time_ms, seqNo), nil
+}
+
+func (rs *RedisStore) NotifyBlockedOnStream(key string, entry StreamEntry) bool {
+	blocked := rs.BlockedOnKeys[key]
+	if len(blocked) == 0 {
+		return false
+	}
+	var client *client.Client
+	for _, c := range blocked {
+		if !c.Blop.IsTimedOut() {
+			client = c
+			break
+		}
+	}
+
+	id := fmt.Sprintf("%d-%d", entry.Id.MS, entry.Id.Seq)
+	fields := resp.NewData(resp.Array, entry.Fields)
+
+	entryData := resp.NewData(resp.Array, id, fields)
+	entries := resp.NewData(resp.Array, entryData)
+	keyData := resp.NewData(resp.Array, key, entries)
+
+	client.QueueMessage(resp.NewData(resp.Array, keyData))
+	client.Blop.Cancel()
+
+	return true
 }
 
 func (rs *RedisStore) Xrange(key string, startStr string, endStr string) ([]StreamEntry, error) {

@@ -6,26 +6,28 @@ import (
 	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 )
 
-func (rs *RedisStore) NotifyBlockedClient(key string, values []string) []string {
-	blocked := rs.BlockedKeys[key]
+func (rs *RedisStore) NotifyBlockedOnList(key string, values []string) []string {
+	blocked := rs.BlockedOnKeys[key]
 	if len(blocked) == 0 {
 		return values
 	}
 
-	remainingValues := values
-
+	remaining := values
 	for i, c := range blocked {
-		if len(remainingValues) == 0 {
-			rs.BlockedKeys[key] = blocked[i:]
-			return remainingValues
+		if c.Blop.IsTimedOut() {
+			continue
 		}
+		c.QueueMessage(resp.NewData(resp.Array, []string{key, remaining[0]}))
 		c.Blop.Cancel()
-		c.QueueMessage(resp.NewData(resp.Array, []string{key, remainingValues[0]}))
-		remainingValues = remainingValues[1:]
+
+		remaining = remaining[1:]
+		if len(remaining) == 0 {
+			rs.BlockedOnKeys[key] = blocked[i:]
+			break
+		}
 	}
 
-	delete(rs.BlockedKeys, key)
-	return remainingValues
+	return remaining
 }
 
 func (rs *RedisStore) Rpush(key string, elements []string) (int, error) {
@@ -40,7 +42,7 @@ func (rs *RedisStore) Rpush(key string, elements []string) (int, error) {
 	}
 
 	totalLen := len(list) + len(elements)
-	elements = rs.NotifyBlockedClient(key, elements)
+	elements = rs.NotifyBlockedOnList(key, elements)
 
 	if len(elements) > 0 {
 		list = append(list, elements...)
@@ -63,7 +65,7 @@ func (rs *RedisStore) Lpush(key string, elements []string) (int, error) {
 	}
 
 	totalLen := len(list) + len(elements)
-	elements = rs.NotifyBlockedClient(key, elements)
+	elements = rs.NotifyBlockedOnList(key, elements)
 
 	if len(elements) > 0 {
 		slices.Reverse(elements)

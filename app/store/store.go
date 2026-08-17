@@ -9,9 +9,9 @@ import (
 )
 
 type RedisStore struct {
-	Store       map[string]*Value
-	BlockedKeys map[string][]*client.Client
-	WatchedKeys map[string][]*client.Client
+	Store         map[string]*Value
+	BlockedOnKeys map[string][]*client.Client
+	WatchedKeys   map[string][]*client.Client
 
 	dir        string
 	dbfilename string
@@ -19,11 +19,11 @@ type RedisStore struct {
 
 func InitializeStore(dir string, dbfilename string) (*RedisStore, error) {
 	store := &RedisStore{
-		Store:       make(map[string]*Value),
-		BlockedKeys: make(map[string][]*client.Client),
-		WatchedKeys: make(map[string][]*client.Client),
-		dir:         dir,
-		dbfilename:  dbfilename,
+		Store:         make(map[string]*Value),
+		BlockedOnKeys: make(map[string][]*client.Client),
+		WatchedKeys:   make(map[string][]*client.Client),
+		dir:           dir,
+		dbfilename:    dbfilename,
 	}
 	err := RestoreRDBSnapshot(store)
 	if err != nil {

@@ -14,32 +14,39 @@ type Command struct {
 	Raw  []byte
 }
 
-type Client struct {
-	Conn       net.Conn
-	authAsUser *User
-	Role       Role
+type BlockOp struct {
+	Ctx         context.Context
+	Cancel      context.CancelFunc
+	Reploffset  int
+	Numreplicas int
+	Keys        Set[string]
+}
 
-	Command Command
+func (b BlockOp) IsTimedOut() bool {
+	return b.Ctx.Err() == context.DeadlineExceeded
+}
+
+type Client struct {
+	Conn net.Conn
+	Role Role
+
+	Reader   *Reader
+	respChan chan resp.Data
+	Command  Command
+
+	authAsUser *User
 
 	subscriptions Set[string]
 	messageChan   chan PubMessage
 
-	InMulti    bool
-	QueuedCmds []Command
-	CASDirty   bool
-
+	InMulti      bool
+	QueuedCmds   []Command
+	CASDirty     bool
 	WatchingKeys Set[string]
 
-	Blop struct {
-		Cancel      context.CancelFunc
-		Reploffset  int
-		Numreplicas int
-	}
-
-	Blocked  bool
-	Unblock  chan struct{}
-	respChan chan resp.Data
-	Reader   *Reader
+	Blop       BlockOp
+	Blocked    bool
+	UnblockSig chan struct{}
 }
 
 func NewClient(conn net.Conn, role Role) *Client {
@@ -96,12 +103,12 @@ func (c *Client) WriteLoop() error {
 
 func (c *Client) Block() {
 	c.Blocked = true
-	c.Unblock = make(chan struct{})
+	c.UnblockSig = make(chan struct{})
 }
 
 func (c *Client) UnBlock() {
 	c.Blocked = false
-	close(c.Unblock)
+	close(c.UnblockSig)
 }
 
 func (c *Client) InSubscribeMode() bool {

@@ -35,11 +35,12 @@ func HandleReplconf(c *client.Client) resp.Data {
 				return resp.Err("value is not an integer or out of range")
 			}
 			s.Replicas[c] = off
+
 			for _, blClient := range s.BlClients {
-				if s.CountSyncedReplicas(blClient.Blop.Reploffset) >= blClient.Blop.Numreplicas {
-					if blClient.Blop.Cancel != nil {
-						blClient.Blop.Cancel()
-					}
+				synced := s.CountSyncedReplicas(blClient.Blop.Reploffset)
+				if synced >= blClient.Blop.Numreplicas {
+					c.QueueMessage(resp.NewData(resp.Integer, synced))
+					blClient.Blop.Cancel()
 				}
 			}
 			return resp.None()
@@ -86,12 +87,15 @@ func HandleWait(c *client.Client) resp.Data {
 	c.Blop.Numreplicas = numreplicas
 	s.BlClients = append(s.BlClients, c)
 
-	f := func() {
-		s.BlClients = filter(s.BlClients, c)
-		c.QueueMessage(resp.NewData(resp.Integer, s.CountSyncedReplicas(targetOffset)))
-	}
 	duration := time.Duration(timeout_s * float64(time.Millisecond))
-	Wait(c, duration, f, f)
+	cleanUp := func() {
+		s.BlClients = filter(s.BlClients, c)
+	}
+	timeout := func() {
+		c.QueueMessage(resp.NewData(resp.Integer, s.CountSyncedReplicas(targetOffset)))
+		cleanUp()
+	}
+	Wait(c, duration, cleanUp, timeout)
 
 	getack := resp.NewData(resp.Array, []string{"REPLCONF", "GETACK", "*"})
 	for slave := range s.Replicas {
