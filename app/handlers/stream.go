@@ -8,6 +8,7 @@ import (
 
 	resp "github.com/codecrafters-io/redis-starter-go/app/Resp"
 	"github.com/codecrafters-io/redis-starter-go/app/client"
+	"github.com/codecrafters-io/redis-starter-go/app/store"
 )
 
 func HandleXadd(c *client.Client) resp.Data {
@@ -88,10 +89,16 @@ func HandleXread(c *client.Client) resp.Data {
 	answers := make([]resp.Data, 0, len(streams))
 	for i, stream := range streams {
 		id := ids[i]
-		entries, err := s.Store.Xread(stream, id)
-		if err != nil {
-			return resp.Err(err.Error())
+		var entries []store.StreamEntry
+		var err error
+
+		if id != "$" {
+			entries, err = s.Store.Xread(stream, id)
+			if err != nil {
+				return resp.Err(err.Error())
+			}
 		}
+
 		answer := make([]resp.Data, 0, len(entries))
 		for _, entry := range entries {
 			id := fmt.Sprintf("%d-%d", entry.Id.MS, entry.Id.Seq)

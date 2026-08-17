@@ -107,6 +107,9 @@ func (c *Client) Block() {
 }
 
 func (c *Client) UnBlock() {
+	if !c.Blocked {
+		return
+	}
 	c.Blocked = false
 	close(c.UnblockSig)
 }

@@ -22,7 +22,7 @@ func (rs *RedisStore) NotifyBlockedOnList(key string, values []string) []string 
 
 		remaining = remaining[1:]
 		if len(remaining) == 0 {
-			rs.BlockedOnKeys[key] = blocked[i:]
+			rs.BlockedOnKeys[key] = blocked[i+1:]
 			break
 		}
 	}

@@ -134,6 +134,9 @@ func (rs *RedisStore) NotifyBlockedOnStream(key string, entry StreamEntry) bool 
 			break
 		}
 	}
+	if client == nil {
+		return false
+	}
 
 	id := fmt.Sprintf("%d-%d", entry.Id.MS, entry.Id.Seq)
 	fields := resp.NewData(resp.Array, entry.Fields)
@@ -221,9 +224,11 @@ func (rs *RedisStore) Xread(key string, startIDStr string) ([]StreamEntry, error
 		return nil, err
 	}
 
+	var entries []StreamEntry
+
 	var startID StreamID
 	if startIDStr == "$" {
-		startID = stream.LastID
+		return entries, nil
 	} else {
 		var err error
 		startID, err = parseStreamIDBound(startIDStr, false)
@@ -232,7 +237,6 @@ func (rs *RedisStore) Xread(key string, startIDStr string) ([]StreamEntry, error
 		}
 	}
 
-	var entries []StreamEntry
 	for _, entry := range stream.Entries {
 		if streamIDLess(startID, entry.Id) {
 			entries = append(entries, entry)

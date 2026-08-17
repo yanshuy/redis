@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -36,7 +37,7 @@ func HandleReplconf(c *client.Client) resp.Data {
 			}
 			s.Replicas[c] = off
 
-			for _, blClient := range s.BlClients {
+			for _, blClient := range slices.Clone(s.BlClients) {
 				synced := s.CountSyncedReplicas(blClient.Blop.Reploffset)
 				if synced >= blClient.Blop.Numreplicas {
 					blClient.QueueMessage(resp.NewData(resp.Integer, synced))
