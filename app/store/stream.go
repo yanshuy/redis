@@ -11,7 +11,7 @@ import (
 
 type StreamID struct {
 	MS  int64
-	Seq int
+	Seq uint64
 }
 
 type StreamEntry struct {
@@ -24,16 +24,6 @@ type Stream struct {
 	Entries []StreamEntry
 }
 
-func streamIDLessOrEqual(a, b StreamID) bool {
-	if a.MS < b.MS {
-		return true
-	}
-	if a.MS == b.MS {
-		return a.Seq <= b.Seq
-	}
-	return false
-}
-
 func streamIDLess(a, b StreamID) bool {
 	if a.MS < b.MS {
 		return true
@@ -44,42 +34,40 @@ func streamIDLess(a, b StreamID) bool {
 	return false
 }
 
+func streamIDLessOrEqual(a, b StreamID) bool {
+	if a.MS < b.MS {
+		return true
+	}
+	if a.MS == b.MS {
+		return a.Seq <= b.Seq
+	}
+	return false
+}
+
 func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (string, error) {
 	val, ok := rs.Look(key)
-	var stream Stream
 	if !ok {
 		val = NewValue(STREAM, 0)
 		rs.Store[key] = val
-	} else {
-		var err error
-		stream, err = As[Stream](val)
-		if err != nil {
-			return "", err
-		}
+	}
+	stream, err := As[Stream](val)
+	if err != nil {
+		return "", err
 	}
 
 	hasEntries := len(stream.Entries) > 0
 
 	var time_ms int64
-	var seqNo int
-	var err error
+	var seqNo uint64 = 0
 
 	if stream_key == "*" {
 		time_ms = time.Now().UnixMilli()
 		if hasEntries {
 			if time_ms < stream.LastID.MS {
 				time_ms = stream.LastID.MS
-				seqNo = stream.LastID.Seq + 1
-			} else if time_ms == stream.LastID.MS {
-				seqNo = stream.LastID.Seq + 1
-			} else {
-				seqNo = 0
 			}
-		} else {
-			if time_ms == 0 {
-				seqNo = 1
-			} else {
-				seqNo = 0
+			if time_ms == stream.LastID.MS {
+				seqNo = stream.LastID.Seq + 1
 			}
 		}
 	} else {
@@ -88,7 +76,7 @@ func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (string, e
 			return "", errors.New("invalid stream key")
 		}
 		time_ms, err = strconv.ParseInt(parts[0], 10, 64)
-		if err != nil || time_ms < 0 {
+		if err != nil {
 			return "", errors.New("invalid stream key")
 		}
 
@@ -101,8 +89,8 @@ func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (string, e
 				seqNo = 0
 			}
 		} else {
-			seqNo, err = strconv.Atoi(parts[1])
-			if err != nil || seqNo < 0 {
+			seqNo, err = strconv.ParseUint(parts[1], 10, 64)
+			if err != nil {
 				return "", errors.New("invalid stream key")
 			}
 		}
@@ -125,39 +113,6 @@ func (rs *RedisStore) Xadd(key, stream_key string, key_vals []string) (string, e
 
 	rs.TouchWatchedKey(key)
 	return fmt.Sprintf("%d-%d", time_ms, seqNo), nil
-}
-
-func parseStreamIDBound(s string, isEnd bool) (StreamID, error) {
-	s = strings.TrimSpace(s)
-	if s == "-" {
-		return StreamID{MS: 0, Seq: 0}, nil
-	}
-	if s == "+" {
-		return StreamID{MS: math.MaxInt64, Seq: math.MaxInt}, nil
-	}
-
-	parts := strings.Split(s, "-")
-	if len(parts) == 1 {
-		ms, err := strconv.ParseInt(parts[0], 10, 64)
-		if err != nil {
-			return StreamID{}, errors.New("invalid arguments")
-		}
-		if isEnd {
-			return StreamID{MS: ms, Seq: math.MaxInt}, nil
-		}
-		return StreamID{MS: ms, Seq: 0}, nil
-	} else if len(parts) == 2 {
-		ms, err := strconv.ParseInt(parts[0], 10, 64)
-		if err != nil {
-			return StreamID{}, errors.New("invalid arguments")
-		}
-		seq, err := strconv.Atoi(parts[1])
-		if err != nil {
-			return StreamID{}, errors.New("invalid arguments")
-		}
-		return StreamID{MS: ms, Seq: seq}, nil
-	}
-	return StreamID{}, errors.New("invalid arguments")
 }
 
 func (rs *RedisStore) Xrange(key string, startStr string, endStr string) ([]StreamEntry, error) {
@@ -190,9 +145,42 @@ func (rs *RedisStore) Xrange(key string, startStr string, endStr string) ([]Stre
 	return entries, nil
 }
 
+func parseStreamIDBound(s string, isEnd bool) (StreamID, error) {
+	s = strings.TrimSpace(s)
+	if s == "-" {
+		return StreamID{MS: 0, Seq: 0}, nil
+	}
+	if s == "+" {
+		return StreamID{MS: math.MaxInt64, Seq: math.MaxInt}, nil
+	}
+
+	parts := strings.Split(s, "-")
+	if len(parts) == 1 {
+		ms, err := strconv.ParseInt(parts[0], 10, 64)
+		if err != nil {
+			return StreamID{}, errors.New("invalid arguments")
+		}
+		if isEnd {
+			return StreamID{MS: ms, Seq: math.MaxInt}, nil
+		}
+		return StreamID{MS: ms, Seq: 0}, nil
+	} else if len(parts) == 2 {
+		ms, err := strconv.ParseInt(parts[0], 10, 64)
+		if err != nil {
+			return StreamID{}, errors.New("invalid arguments")
+		}
+		seq, err := strconv.ParseUint(parts[1], 10, 64)
+		if err != nil {
+			return StreamID{}, errors.New("invalid arguments")
+		}
+		return StreamID{MS: ms, Seq: seq}, nil
+	}
+	return StreamID{}, errors.New("invalid arguments")
+}
+
 func (rs *RedisStore) Xread(key string, startIDStr string) ([]StreamEntry, error) {
-	val, exists := rs.Look(key)
-	if !exists {
+	val, ok := rs.Look(key)
+	if !ok {
 		return nil, nil
 	}
 	stream, err := As[Stream](val)

@@ -138,3 +138,11 @@ func generateRandID() string {
 	rand.Read(bytes)
 	return hex.EncodeToString(bytes)
 }
+
+func debug(v ...any) {
+	print := "GOOOOOOOSONNN\n"
+	for range v {
+		print = print + " %+v\n"
+	}
+	fmt.Printf(print, v...)
+}
